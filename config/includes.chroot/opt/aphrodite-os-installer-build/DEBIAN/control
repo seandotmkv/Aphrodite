@@ -1,0 +1,8 @@
+Package: aphrodite-os-live-installer
+Version: 0.2
+Architecture: all
+Maintainer: aphrodite-os build
+Depends: calamares, calamares-settings-debian, pkexec, blackbox-terminal, python3, util-linux, fdisk, udev, squashfs-tools, e2fsprogs, btrfs-progs, dosfstools, grub2-common, grub-pc-bin, grub-efi-amd64-bin, efibootmgr, initramfs-tools, console-setup, locales, systemd-timesyncd
+Section: admin
+Priority: optional
+Description: aphrodite-os live terminal installer and Calamares configuration

@@ -1,0 +1,81 @@
+#!/usr/bin/python3
+"""Review installation results, retry selections or export private diagnostics."""
+import argparse
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tarfile
+import tempfile
+from datetime import datetime, timezone
+
+sys.path.insert(0, '/usr/lib/aphrodite/packages')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=('status', 'retry', 'export'))
+    args = parser.parse_args()
+    path = Path('/var/lib/aphrodite-os/install-manifest.json')
+    if not path.is_file():
+        parser.error('No installation manifest is available on this system')
+    data = json.loads(path.read_text())
+    if args.action == 'status':
+        for key, app in data['applications'].items():
+            print(f"{app['name']}: {app['status']}" + (f" — {app['reason']}" if app.get('reason') else ''))
+        print('\nRetry: sudo aphrodite-apps retry\nExport diagnostics: sudo aphrodite-apps export')
+        return 0
+    if os.geteuid():
+        parser.error('Run this action with sudo')
+    if args.action == 'retry':
+        if Path('/etc/aphrodite/transactional.json').is_file():
+            return subprocess.call(['/usr/bin/aphrodite-system', 'retry-apps'])
+        from executor import apply
+        from selection import validate
+        results = apply('/', validate(data['selection']), installed=True, progress=lambda line: print(line, flush=True))
+        return int(any(' incomplete.' in line or ' skipped' in line for line in results))
+    directory = Path('/var/log/aphrodite-os')
+    directory.mkdir(mode=0o700, exist_ok=True)
+    with tempfile.NamedTemporaryFile(prefix='diagnostics-', suffix='.tar.gz', dir=directory, delete=False) as output:
+        destination = Path(output.name)
+    try:
+        with tarfile.open(destination, 'w:gz') as archive:
+            files = [path, Path('/etc/os-release'), Path('/var/log/aphrodite-os-install.log'),
+                     Path('/var/log/aphrodite-os-selected-packages.log')]
+            files += list(directory.glob('install-*.log*'))
+            for file in files:
+                if not file.is_file() or file.is_symlink():
+                    continue
+                with file.open('rb') as stream:
+                    stream.seek(0, 2)
+                    stream.seek(max(0, stream.tell() - 4_000_000))
+                    content = stream.read(4_000_000)
+                info = tarfile.TarInfo(str(file).lstrip('/'))
+                info.size, info.mode = len(content), 0o600
+                archive.addfile(info, io.BytesIO(content))
+            for command in (['uname', '-a'], ['lsblk', '--json', '--output', 'NAME,TYPE,SIZE,FSTYPE,RO,MOUNTPOINTS']):
+                try:
+                    result = subprocess.run(command, text=True, stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT, timeout=10)
+                    content = result.stdout[-100_000:].encode()
+                    info = tarfile.TarInfo('system/' + command[0] + '.txt')
+                    info.size, info.mode = len(content), 0o600
+                    archive.addfile(info, io.BytesIO(content))
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            content = ('Generated ' + datetime.now(timezone.utc).isoformat() +
+                       '\nDiagnostic files are bounded to their last 4 MB. No home, shadow, Wi-Fi credentials or authentication files are collected.\n').encode()
+            info = tarfile.TarInfo('REPORT.txt'); info.size = len(content); info.mode = 0o600
+            archive.addfile(info, io.BytesIO(content))
+        destination.chmod(0o600)
+        print(destination)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,0 +1,15 @@
+# File Roller already depends on 7zip and libarchive.
+7zip-rar
+xz-utils
+zstd
+unzip
+zip
+# Removable media and filesystem maintenance.
+udisks2
+gvfs
+exfatprogs
+ntfs-3g
+# Desktop accessibility and authentication.
+at-spi2-core
+orca
+polkit-kde-agent-1

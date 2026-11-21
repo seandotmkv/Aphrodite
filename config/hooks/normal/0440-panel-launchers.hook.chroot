@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+# Both Plasma task managers use this KConfig schema. Clear its launchers
+# default too: first login and subsequently created default panels must not
+# inherit pins for applications which aphrodite-os does not install.
+python3 - /usr/share/plasma/plasmoids <<'PY'
+import json
+from pathlib import Path
+import sys
+import xml.etree.ElementTree as ET
+
+plasmoids = Path(sys.argv[1])
+taskmanager = "org.kde.plasma.taskmanager"
+icons = plasmoids / "org.kde.plasma.icontasks/metadata.json"
+metadata = json.loads(icons.read_text(encoding="utf-8"))
+if metadata.get("X-Plasma-RootPath") != taskmanager:
+    raise SystemExit("Unexpected Icons-Only Task Manager schema: inspect before building")
+
+schema = plasmoids / taskmanager / "contents/config/main.xml"
+parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+tree = ET.parse(schema, parser=parser)
+root = tree.getroot()
+namespace = "http://www.kde.org/standards/kcfg/1.0"
+ET.register_namespace("", namespace)
+ET.register_namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance")
+tag = lambda name: "{" + namespace + "}" + name
+entries = [entry for group in root.findall(tag("group"))
+           if group.get("name") == "General"
+           for entry in group.findall(tag("entry"))
+           if entry.get("name") == "launchers"]
+if len(entries) != 1 or entries[0].get("type") != "StringList":
+    raise SystemExit("Expected one General/launchers StringList in Plasma's schema")
+defaults = entries[0].findall(tag("default"))
+if len(defaults) != 1:
+    raise SystemExit("Expected one launcher default; inspect Plasma's schema")
+defaults[0].text = ""
+tree.write(schema, encoding="utf-8", xml_declaration=True)
+if (ET.parse(schema).find(".//" + tag("entry") + "[@name='launchers']/" + tag("default")).text or "").strip():
+    raise SystemExit("Failed to clear task-manager launcher defaults")
+print("Panel application launcher defaults cleared; other schema entries preserved")
+PY

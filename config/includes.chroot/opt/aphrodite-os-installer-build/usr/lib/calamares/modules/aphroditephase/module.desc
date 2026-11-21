@@ -1,0 +1,5 @@
+---
+type: job
+name: aphroditephase
+interface: python
+script: main.py

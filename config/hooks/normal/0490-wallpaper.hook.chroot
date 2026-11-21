@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+sha256sum -c /usr/share/doc/aphrodite-os/wallpaper.sha256

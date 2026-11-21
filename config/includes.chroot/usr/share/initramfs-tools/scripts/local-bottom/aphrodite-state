@@ -1,0 +1,23 @@
+#!/bin/sh
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+. /scripts/functions
+deployment=
+for option in $(cat /proc/cmdline); do
+    case "$option" in aphrodite.deployment=*) deployment=${option#aphrodite.deployment=} ;; esac
+done
+test -n "$deployment" || exit 0
+case "$deployment" in *[!a-z0-9-]*|?????????????????????????????????????????????????????????????????*) panic 'Invalid Aphrodite deployment' ;; esac
+state="${rootmnt}/.aphrodite-state"
+device=$(resolve_device "$ROOT")
+mount -t btrfs -o rw,subvolid=5,nosuid,nodev "$device" "$state" || panic 'Cannot mount Aphrodite state'
+for name in etc var; do
+    mount --bind "$state/@deployments/$deployment/$name" "${rootmnt}/$name" || panic "Cannot mount Aphrodite $name"
+done
+for pair in home:home root:root log:var/log cache:var/cache tmp:var/tmp flatpak:var/lib/flatpak containers:var/lib/containers docker:var/lib/docker; do
+    source=${pair%%:*}
+    target=${pair#*:}
+    mkdir -p "${rootmnt}/$target"
+    mount --bind "$state/@shared/$source" "${rootmnt}/$target" || panic "Cannot mount Aphrodite $target"
+done

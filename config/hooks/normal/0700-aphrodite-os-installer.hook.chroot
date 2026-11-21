@@ -1,0 +1,103 @@
+#!/bin/sh
+set -eu
+
+staging=/opt/aphrodite-os-installer-build
+test "$(dpkg-query -W -f='${Version}' calamares)" = 3.3.14-1
+test "$(dpkg-query -W -f='${Version}' calamares-settings-debian)" = 13.0.13-1
+dpkg-query -L calamares-settings-debian | grep -Fx /etc/calamares/settings.conf
+test -x /usr/sbin/grub-install
+test -x /usr/sbin/grub-mkconfig
+test -d /usr/lib/grub/i386-pc
+test -d /usr/lib/grub/x86_64-efi
+
+# Retain Debian's target mounting, SquashFS, bootloader, and initramfs jobs.
+# Bootloader binaries are present in the SquashFS, so this path needs no
+# unsigned media package repository, network mirror, or package-pool job.
+python3 - "$staging" <<'PY'
+from pathlib import Path
+import sys
+import yaml
+
+directory = Path(sys.argv[1]) / "etc/calamares"
+source = Path("/etc/calamares/settings.conf")
+settings = yaml.safe_load(source.read_text())
+settings["branding"] = "aphrodite-os"
+settings["prompt-install"] = True
+settings["disable-cancel-during-exec"] = True
+settings["instances"] = settings.get("instances") or []
+settings["instances"].extend([
+    {"id": "aphroditepackages", "module": "packagechooserq", "config": "aphroditepackages.conf"},
+    {"id": "aphroditeclock", "module": "packagechooserq", "config": "aphroditeclock.conf"},
+    {"id": "aphroditecleanup", "module": "shellprocess", "config": "sean-cleanup.conf"},
+    {"id": "aphroditebootloader", "module": "bootloader", "config": "sean-bootloader.conf"},
+])
+prepare, execute, finish = settings["sequence"]
+prepare["show"].remove("keyboard")
+prepare["show"].insert(prepare["show"].index("welcome") + 1, "keyboard")
+finish["show"][finish["show"].index("finished")] = "finishedq"
+prepare["show"].insert(prepare["show"].index("locale"), "packagechooserq@aphroditeclock")
+prepare["show"].insert(prepare["show"].index("summary"), "packagechooserq@aphroditepackages")
+jobs = execute["exec"]
+for name in ("sources-media", "sources-media-unmount", "sources-final",
+             "bootloader-config", "dpkg-unsafe-io", "dpkg-unsafe-io-undo"):
+    if name in jobs:
+        jobs.remove(name)
+jobs[jobs.index("packages")] = "shellprocess@aphroditecleanup"
+jobs[jobs.index("bootloader")] = "bootloader@aphroditebootloader"
+bootloader = yaml.safe_load((source.parent / "modules/bootloader.conf").read_text())
+bootloader["efiBootloaderId"] = "aphrodite-os"
+bootloader["installEFIFallback"] = False
+(directory / "modules/sean-bootloader.conf").write_text(yaml.safe_dump(bootloader, sort_keys=False))
+jobs.insert(jobs.index("umount"), "aphroditeprofiles")
+jobs.insert(jobs.index("hwclock") + 1, "aphroditeclock")
+for phase, anchor, label in (
+    (1, "partition", "Storage Configuration"),
+    (2, "unpackfs", "Software Installation"),
+    (3, "machineid", "System Configuration"),
+    (4, "aphroditeprofiles", "Finalization"),
+):
+    instance = f"aphroditephase{phase}"
+    config = f"{instance}.conf"
+    settings["instances"].append({"id": instance, "module": "aphroditephase", "config": config})
+    (directory / "modules" / config).write_text(yaml.safe_dump({"phase": phase, "label": label}))
+    jobs.insert(jobs.index(anchor), f"aphroditephase@{instance}")
+# Preserve the vendor configuration below with a dpkg diversion.
+(directory / "settings.conf").write_text(yaml.safe_dump(settings, sort_keys=False))
+PY
+
+# Use the new launcher exclusively. Debian's autostart only creates its own
+# shortcut, but it would give users two launchers for the same backend.
+dpkg-query -L calamares-settings-debian | while IFS= read -r path; do
+    case "$path" in
+        /etc/xdg/autostart/*.desktop|/usr/share/applications/*calamares*.desktop)
+            rm -f -- "$path" ;;
+    esac
+done
+# These configurations are package-owned by Debian. Preserve the originals
+# alongside the files owned by the aphrodite-os installer package.
+for name in partition keyboard users welcome; do
+    if dpkg-query -S "/etc/calamares/modules/$name.conf" >/dev/null 2>&1; then
+        dpkg-divert --package aphrodite-os-live-installer --rename --add --divert "/etc/calamares/modules/$name.conf.debian" \
+            "/etc/calamares/modules/$name.conf"
+    fi
+done
+
+dpkg-divert --package aphrodite-os-live-installer --rename --add --divert /etc/calamares/settings.conf.debian /etc/calamares/settings.conf
+for program in bin/install-aphrodite-os bin/aphrodite-os-installer-tui libexec/aphrodite-os-installer-root libexec/aphrodite-os-protect-medium; do
+    test -x "$staging/usr/$program"
+done
+test -r "$staging/usr/libexec/aphrodite_os_install.py"
+test -r "$staging/usr/libexec/aphrodite_os_progress.py"
+test -r "$staging/usr/lib/calamares/modules/aphroditeprofiles/processio.py"
+python3 -B "$staging/usr/bin/aphrodite-os-installer-tui" --demo --preview --progress-preview >/dev/null
+desktop-file-validate "$staging/usr/share/applications/install-aphrodite-os.desktop"
+desktop-file-validate "$staging/etc/xdg/autostart/aphrodite-os-live-shortcut.desktop"
+python3 -B "$staging/usr/lib/calamares/modules/aphroditeprofiles/metadata.py" \
+    "$staging/etc/calamares/branding/aphrodite-os/PackageCatalog.js"
+find "$staging" -type d -name __pycache__ -prune -exec rm -rf -- {} +
+temp=$(mktemp -d)
+trap 'rm -rf "$temp"' EXIT
+dpkg-deb --root-owner-group --build "$staging" "$temp/aphrodite-os-live-installer.deb"
+dpkg -i "$temp/aphrodite-os-live-installer.deb"
+rm -rf "$staging"
+apt-get check

@@ -1,0 +1,136 @@
+#!/usr/bin/python3
+"""Read-only fallback for Ventoy mappings hidden from lsblk/device-mapper.
+
+Only return a device ID when the mounted medium is Ventoy and exactly one
+whole disk matches the boot metadata's Ventoy GUID AND MBR signature.
+Format: https://www.ventoy.net/en/doc_compatible_format.html
+"""
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import struct
+import subprocess
+import sys
+
+
+MAGIC = bytes.fromhex("20207777772e76656e746f792e6e6574")
+EFI_NAME = "VentoyOsParam-77772020-2e77-6576-6e74-6f792e6e6574"
+
+
+def decode(data):
+    if len(data) != 512 or data[:16] != MAGIC or sum(data) % 256:
+        raise ValueError("invalid Ventoy metadata signature, size or checksum")
+    guid, signature = data[17:33], data[481:485]
+    image_path = data[45:429].split(b"\0", 1)[0]
+    image_size = struct.unpack_from("<Q", data, 429)[0]
+    if guid == bytes(16) or not image_path.startswith(b"/") or not image_size:
+        raise ValueError("incomplete Ventoy boot metadata")
+    # Disk size is deliberately not compared: firmware and Linux can report
+    # different sizes, as documented by Ventoy. Never match by size or label.
+    return guid, signature, image_path, image_size
+
+
+def read_at(path, offset, length):
+    with path.open("rb", buffering=0) as stream:
+        stream.seek(offset)
+        return stream.read(length)
+
+
+def boot_identity(root=Path("/")):
+    records = []
+    locations = [
+        ("ventoy/ventoy_os_param", 0),
+        ("run/initramfs/ventoy/ventoy_os_param", 0),
+        ("sys/firmware/efi/efivars/" + EFI_NAME, 4),
+        ("sys/firmware/efi/vars/" + EFI_NAME + "/data", 0),
+    ]
+    for relative, offset in locations:
+        path = root / relative
+        if path.exists():
+            records.append(decode(read_at(path, offset, 513)))
+    acpi = root / "sys/firmware/acpi/tables/VTOY"
+    if acpi.exists():
+        # ACPI has a 36-byte header, followed by the same 512-byte record.
+        header = read_at(acpi, 0, 36)
+        if len(header) != 36 or header[:4] != b"VTOY":
+            raise ValueError("invalid Ventoy ACPI header")
+        records.append(decode(read_at(acpi, 36, 512)))
+    if not records:
+        # Legacy BIOS passes this record in a bounded low-memory region.
+        # Some kernels prohibit the read; do not change kernel restrictions.
+        memory = read_at(root / "dev/mem", 0x80000, 0x20000)
+        for offset in range(0, len(memory) - 511, 16):
+            if memory[offset:offset + 16] == MAGIC:
+                try:
+                    records.append(decode(memory[offset:offset + 512]))
+                except ValueError:
+                    pass
+    identities = set(records)
+    if len(identities) != 1:
+        raise ValueError("Ventoy metadata is absent or conflicting")
+    return identities.pop()
+
+
+def command(*args):
+    return subprocess.check_output(args, text=True).strip()
+
+
+def device_number(number):
+    return f"{os.major(number)}:{os.minor(number)}"
+
+
+def require_ventoy_mount(expected):
+    if not re.fullmatch(r"[0-9]+:[0-9]+", expected):
+        raise ValueError("invalid mounted device ID")
+    fields = command("findmnt", "-rn", "-o", "SOURCE,FSTYPE,MAJ:MIN",
+                     "--mountpoint", "/run/live/medium").split()
+    if fields not in (["/dev/mapper/ventoy", "iso9660", expected],
+                      ["/dev/mapper/ventoy", "udf", expected]):
+        raise ValueError("the live medium is not a recognised Ventoy ISO mount")
+    if device_number(os.stat("/run/live/medium").st_dev) != expected:
+        raise ValueError("live mount identity changed")
+
+
+def matching_disk(identity, devices, read_sector=None, get_stat=None):
+    read_sector = read_sector or (lambda path: read_at(Path(path), 0, 512))
+    get_stat = get_stat or os.stat
+    guid, signature, _image_path, _image_size = identity
+    matches = set()
+    for device in devices:
+        if device["type"] != "disk":
+            continue
+        path, number = device["path"], device["maj:min"]
+        if not re.fullmatch(r"/dev/[A-Za-z0-9_./-]+", path):
+            raise ValueError("invalid disk path")
+        info = get_stat(path)
+        if not stat.S_ISBLK(info.st_mode) or device_number(info.st_rdev) != number:
+            raise ValueError("disk listing is stale")
+        sector = read_sector(path)
+        if len(sector) != 512:
+            raise ValueError("unable to read whole-disk identity")
+        if sector[384:400] == guid and sector[440:444] == signature:
+            matches.add(number)
+    if len(matches) != 1:
+        raise ValueError("Ventoy boot disk is missing or ambiguous")
+    return matches.pop()
+
+
+def main():
+    try:
+        if len(sys.argv) != 2:
+            raise ValueError("expected the mounted device ID")
+        require_ventoy_mount(sys.argv[1])
+        identity = boot_identity()
+        listing = json.loads(command("lsblk", "--json", "--nodeps", "--paths",
+                                     "--output", "PATH,TYPE,MAJ:MIN"))
+        print(matching_disk(identity, listing["blockdevices"]))
+        return 0
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        print(f"Ventoy disk detection: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

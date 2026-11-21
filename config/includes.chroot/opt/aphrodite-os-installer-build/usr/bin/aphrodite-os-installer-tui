@@ -1,0 +1,1127 @@
+#!/usr/bin/python3
+"""Install aphrodite-os from a terminal, or explore the interface in demo mode."""
+import argparse
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
+import json
+import os
+from pathlib import Path
+import queue
+import re
+import signal
+import subprocess
+import sys
+import threading
+import time
+import shutil
+import tempfile
+import base64
+import unicodedata
+
+
+TABS = ("Welcome", "Time", "Storage", "Account", "Packages", "Review")
+TITLES = ("Welcome to aphrodite-os", "Date and time", "Installation and storage",
+          "Create your account", "Additional packages", "Review your choices")
+LANGUAGES = [("en_US.UTF-8", "English (US)"), ("en_IE.UTF-8", "English (Ireland)"),
+             ("ga_IE.UTF-8", "Irish"), ("fr_FR.UTF-8", "French"),
+             ("nl_NL.UTF-8", "Dutch"), ("zh_CN.UTF-8", "Chinese (Simplified)"),
+             ("zh_TW.UTF-8", "Chinese (Traditional)")]
+KEYBOARDS = [(value, label) for value, label in
+             (("us", "US"), ("gb", "UK"), ("ie", "Irish"), ("fr", "French"),
+              ("nl", "Dutch"), ("de", "German"), ("es", "Spanish"), ("cn", "Chinese"))]
+MODES = [("erase", "Erase disk"), ("manual", "Manual layout"),
+         ("alongside", "Install alongside"), ("replace", "Replace a partition")]
+GAME_MODES = [("off", "Desktop only (no gaming session)"),
+              ("desktop", "Desktop default + optional gaming session"),
+              ("gaming", "Gaming session default + desktop available")]
+MODULES = Path(__file__).resolve().parents[1] / "lib/calamares/modules/aphroditeprofiles"
+sys.path.insert(0, str(MODULES))
+from selection import APPS, CATALOG, available, preset, validate
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libexec"))
+import aphrodite_os_install as backend
+from aphrodite_os_progress import Inbox, Progress, Panels, draw as draw_progress
+
+
+@dataclass
+class Disk:
+    path: str
+    size: int
+    model: str = ""
+    number: str = ""
+    blocked: str = ""
+    partitions: list = field(default_factory=list)
+    identity: tuple = ()
+
+
+@dataclass
+class Snapshot:
+    disks: list = field(default_factory=list)
+    verified: bool = False
+    message: str = "Reading disks in the background..."
+    observed: str = ""
+
+
+@dataclass
+class Settings:
+    language: str = "en_US.UTF-8"
+    keyboard: str = "us"
+    variant: str = ""
+    timezone: str = "UTC"
+    automatic_time: bool = True
+    ntp_servers: str = ""
+    manual_time: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M"))
+    twelve_hour: bool = False
+    disk: str = ""
+    mode: str = "erase"
+    partition: str = ""
+    filesystem: str = "ext4"
+    encryption: bool = False
+    swap: str = "file"
+    full_name: str = ""
+    username: str = ""
+    hostname: str = "aphrodite-os"
+    password: str = field(default="", repr=False)
+    confirmation: str = field(default="", repr=False)
+    game_mode: str = "off"
+    browser: str = "firefox"
+    package_preset: str = "Minimal"
+    package_search: str = ""
+    pin_selected: bool = True
+    pin_core: bool = True
+    pins: set = field(default_factory=lambda: {"firefox"})
+    immutable: bool = False
+    autologin: bool = False
+    packages: dict = field(default_factory=lambda: preset("Minimal"))
+
+
+def size_text(size):
+    return f"{size / 1024**3:.1f} GiB"
+
+
+def demo_snapshot():
+    return Snapshot([
+        Disk("/dev/demo-nvme0n1", 512 * 1024**3, "Example SSD", "demo:1", "",
+             ["/dev/demo-nvme0n1p1", "/dev/demo-nvme0n1p2"]),
+        Disk("/dev/demo-usb", 32 * 1024**3, "Example live USB", "demo:2", "LIVE USB - protected"),
+    ], True, "DEMO disks. No real hardware is used.", "demo")
+
+
+def probe_disks():
+    """Resolve the live disk with the same guard used at write time."""
+    try:
+        protected = backend.protected_devices()
+        protected_numbers = {backend.block_path(path)[0] for path in protected}
+        rows = backend.disk_rows()
+        disks = []
+        for row in rows:
+            path = row["path"]
+            live = path in protected or row["maj:min"] in protected_numbers
+            if row["type"] != "disk" and not live:
+                continue
+            children = backend.partitions(path, rows)
+            identity = ()
+            try:
+                if live:
+                    reason = "Live medium protected"
+                else:
+                    reason = backend.blocked_reason(row, children)
+                    if not reason:
+                        identity = backend.disk_identity(path)
+                        if identity[0] != row["maj:min"] or identity[2] != int(row["size"]):
+                            reason = "Device changed during the scan"
+            except (OSError, ValueError, backend.InstallError):
+                reason = "Device identity unavailable"
+            disks.append(Disk(path, int(row["size"]), (row.get("model") or "").strip(),
+                              row["maj:min"], reason, [child["path"] for child in children], identity))
+        return Snapshot(disks, True, "Live medium identified. Protected disks cannot be selected.",
+                        datetime.now(timezone.utc).isoformat())
+    except (OSError, ValueError, KeyError, TypeError, backend.InstallError, subprocess.SubprocessError) as error:
+        return Snapshot([], False, f"Targets disabled: {error}. F5 retries.")
+
+
+@lru_cache(maxsize=1)
+def zones():
+    try:
+        from zoneinfo import available_timezones
+        values = sorted(available_timezones())
+    except (ImportError, OSError):
+        values = []
+    return [(value, value) for value in values or ["UTC", "Europe/Dublin", "Europe/London",
+            "Europe/Paris", "Europe/Amsterdam", "America/New_York", "Asia/Shanghai", "Asia/Taipei"]]
+
+
+class App:
+    def __init__(self, demo=False, output=None):
+        self.demo, self.output = demo, output
+        self.settings = Settings()
+        self.allow_immutable = False
+        self.snapshot = demo_snapshot() if demo else Snapshot()
+        self.page = self.focus = 0
+        self.editing = None
+        self.buffer = ""
+        self.cursor = 0
+        self.choices = None
+        self.choice_index = 0
+        self.filter = ""
+        self.quit_dialog = False
+        self.done = False
+        self.message = "Choose your settings, then review and confirm the installation."
+        self.install_confirmation = None
+        self.installing = False
+        self.finished = False
+        self.exit_status = 0
+        self.log_path = None
+        self.events = Inbox()
+        self.progress = Progress()
+        self.panels = Panels(self.progress)
+        self.actions = queue.Queue()
+        self.action_busy = False
+        self.clipboard = None
+        self.reboot_dialog = False
+        self.zone_choices = [("UTC", "UTC")]
+        self.zone_results = queue.Queue()
+        self.zone_loading = False
+        self.install_warnings = []
+        self.install_result = queue.Queue()
+        self.results = queue.Queue()
+        self.scanning = False
+        self.expanded = {"browser"}
+        self.session_owned = set()
+        try:
+            metadata_path = MODULES / "metadata.json"
+            if metadata_path.stat().st_size > 8_000_000:
+                raise ValueError("Metadata snapshot exceeds the supported size")
+            snapshot = json.loads(metadata_path.read_text())
+            created = datetime.fromisoformat(snapshot["created"])
+            self.metadata = (snapshot["entries"] if snapshot["version"] == CATALOG["version"]
+                             and datetime.now(timezone.utc) - created < timedelta(days=90) else {})
+            self.metadata_date = created.date().isoformat() if self.metadata else ""
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            self.metadata = {}
+            self.metadata_date = ""
+
+    def refresh(self):
+        if self.demo or self.scanning or self.installing or self.finished:
+            return
+        self.scanning = True
+        self.snapshot = Snapshot()
+        self.settings.disk = self.settings.partition = ""
+
+        def worker():
+            try:
+                snapshot = probe_disks()
+                if not snapshot.verified and self.log_path:
+                    with self.log_path.open("a") as log:
+                        print(snapshot.message, file=log)
+                self.results.put(snapshot)
+            except Exception:
+                import traceback
+                if self.log_path:
+                    with self.log_path.open("a") as log:
+                        traceback.print_exc(file=log)
+                self.results.put(Snapshot([], False, "Disk scan failed; targets disabled. See the diagnostic log. F5 retries."))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def load_zones(self):
+        # available_timezones traverses the filesystem. It must never run in
+        # fields(), render(), or a terminal input handler.
+        if self.zone_loading:
+            return
+        self.zone_loading = True
+        def worker():
+            try:
+                self.zone_results.put(zones())
+            except Exception:
+                self.zone_results.put([("UTC", "UTC")])
+        threading.Thread(target=worker, daemon=True).start()
+
+    def poll(self):
+        for event in self.events.drain():
+            self.progress.consume(event)
+        try:
+            self.zone_choices = self.zone_results.get_nowait()
+            self.zone_loading = False
+            if self.choices and self.choices[0] == "timezone":
+                self.choices = ("timezone", self.choices[1], self.zone_choices)
+                self.choice_index = 0
+        except queue.Empty:
+            pass
+        try:
+            message, clipboard = self.actions.get_nowait()
+            self.panels.message, self.clipboard = message, clipboard
+            self.action_busy = False
+        except queue.Empty:
+            pass
+        self.panels.update()
+        try:
+            self.snapshot = self.results.get_nowait()
+            self.scanning = False
+        except queue.Empty:
+            pass
+
+        try:
+            status, message, self.install_warnings = self.install_result.get_nowait()
+        except queue.Empty:
+            return
+        self.installing, self.finished = False, True
+        self.exit_status, self.message = status, message
+        self.progress.finish(status, message, self.install_warnings)
+        self.panels.update()
+
+    def log_action(self, copy=False):
+        if self.action_busy:
+            self.panels.message = "A log operation is already running."
+            return
+        if not self.log_path:
+            self.panels.message = "No diagnostic file is available in this session."
+            return
+        self.action_busy = True
+        self.panels.message = "Preparing clipboard request..." if copy else "Saving complete diagnostic log..."
+        def worker():
+            try:
+                if copy:
+                    with self.log_path.open("rb") as stream:
+                        stream.seek(0, os.SEEK_END)
+                        length = stream.tell()
+                        stream.seek(max(0, length - 100_000))
+                        data = stream.read(100_000)
+                    self.actions.put(("Clipboard request prepared (terminal support required). "
+                                      + ("Last 100 KB requested; Save exports the complete file." if length > 100_000 else ""),
+                                      base64.b64encode(data).decode("ascii")))
+                else:
+                    with tempfile.NamedTemporaryFile(prefix="saved-install-", suffix=".log",
+                                                     dir=self.log_path.parent, delete=False) as output:
+                        os.chmod(output.name, 0o600)
+                        with self.log_path.open("rb") as source:
+                            shutil.copyfileobj(source, output)
+                        path = output.name
+                    self.actions.put(("Saved private log: " + path, None))
+            except OSError as error:
+                self.actions.put(("Log operation failed: " + str(error), None))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def restart(self):
+        if self.demo or self.installing or not self.finished or self.exit_status:
+            self.panels.message = "Restart is available only after a successful real installation."
+            return
+        self.reboot_dialog = True
+
+    def confirm_restart(self):
+        self.reboot_dialog = False
+        self.panels.message = "Requesting system restart..."
+        def worker():
+            try:
+                subprocess.run(["systemctl", "reboot"], stdin=subprocess.DEVNULL,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               text=True, check=True, timeout=20)
+            except (OSError, subprocess.SubprocessError) as error:
+                self.actions.put(("Restart failed: " + str(error) + ". You may close the installer.", None))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def review_install(self):
+        issues = self.errors()
+        if issues:
+            self.message = issues[0]
+        else:
+            try:
+                if not self.demo:
+                    backend.validate_account(self.settings)
+            except (backend.InstallError, OSError) as error:
+                self.message = str(error)
+                return
+            self.install_confirmation = self.disk()
+            self.buffer = ""
+
+    def start_install(self):
+        disk = self.install_confirmation
+        if self.demo or disk is None or self.buffer != f"ERASE {disk.path}":
+            return
+        self.install_confirmation = None
+        self.buffer = ""
+        try:
+            selection = self.package_selection()
+        except ValueError as error:
+            self.message = str(error)
+            return
+        settings = self.settings
+        password = settings.password
+        settings.password = settings.confirmation = ""
+        self.installing = True
+        self.progress.begin({key: APPS[key]["name"] for key in selection["apps"]})
+
+        def worker():
+            try:
+                warnings = backend.install(settings, disk.identity, selection, password,
+                                           self.events.put, self.log_path)
+            except Exception as error:
+                self.install_result.put((1, f"Installation failed. {error}", []))
+            else:
+                message = ("Installed with package or session warnings. Review the log before rebooting."
+                           if warnings else "Installation complete. Reboot and remove the live medium.")
+                self.install_result.put((0, message, warnings))
+
+        # Keep cleanup running even if the terminal is interrupted.
+        threading.Thread(target=worker).start()
+
+    def disk(self):
+        return next((disk for disk in self.snapshot.disks if disk.path == self.settings.disk), None)
+
+    def fields(self):
+        s = self.settings
+        # name, label, choices (None=text, bool=checkbox), explanatory hint
+        if self.page == 0:
+            return [("language", "Language", LANGUAGES, "Target language. Interface labels are English in this first port."),
+                    ("keyboard", "Keyboard layout", KEYBOARDS, "Target keyboard layout; this does not change the live terminal."),
+                    ("variant", "Keyboard variant", None, "Optional XKB variant; leave blank for the standard layout.")]
+        if self.page == 1:
+            result = [("timezone", "Timezone", self.zone_choices, "Timezone list loads in the background; type to filter."),
+                      ("automatic_time", "Automatic time (NTP)", bool, "Use network time in the installed system.")]
+            result += [("ntp_servers", "NTP servers", None, "Optional hostnames separated by spaces.")] if s.automatic_time else [
+                       ("manual_time", "Manual local time", None, "Format: YYYY-MM-DD HH:MM. Sets the system and hardware clock at the end of installation.")]
+            return result + [("twelve_hour", "12-hour clock preview", bool, "Changes the preview only.")]
+        if self.page == 2:
+            disks = [(disk.path, f"{disk.path}  {size_text(disk.size)}  {disk.model}")
+                     for disk in self.snapshot.disks if self.snapshot.verified and not disk.blocked]
+            result = [("disk", "Target disk", disks, "Live, in-use and read-only drives are protected."),
+                      ("mode", "Installation type", MODES, "The terminal backend supports Erase disk only.")]
+            if s.mode in ("replace", "alongside"):
+                result += [("partition", "Existing partition", [(p, p) for p in self.disk().partitions] if self.disk() else [],
+                            "Replacing or shrinking partitions is unavailable in this installer.")]
+            if self.allow_immutable:
+                result += [("immutable", "Transactional base", bool, "DEVELOPMENT: Btrfs deployments, persistent data and rollback. Requires VM validation.")]
+            return result + [("filesystem", "Filesystem", [("ext4", "ext4"), ("btrfs", "btrfs")], "Format the new root partition with this filesystem."),
+                             ("encryption", "Disk encryption", bool, "Encryption is unavailable in the terminal backend."),
+                             ("swap", "Swap", [("none", "None"), ("file", "Swap file")], "Create an optional 2 GiB swap file.")]
+        if self.page == 3:
+            return [("full_name", "Your name", None, "Optional display name."),
+                    ("username", "Username", None, "Lowercase letters, digits, underscores and hyphens; start with a letter or underscore."),
+                    ("hostname", "Computer name", None, "A single hostname, for example aphrodite-os or sean-thinkpad."),
+                    ("password", "Password", None, "Hidden. Kept only in memory and never included in the exported plan."),
+                  ("confirmation", "Confirm password", None, "Enter the same password. The root account stays locked; the user has sudo."),
+                  ("autologin", "Log in automatically", bool, "Skip the login screen on boot. Your password is still required for sudo and unlocking.")]
+        if self.page == 4:
+            result = [
+                ("package_preset", "Preset", [(x, x) for x in ("Minimal", "Recommended", "Full")],
+                 "Recommended adds KeePassXC and PDF Arranger. Full uses the current Debian size snapshot."),
+                ("browser", "Default browser", [(None, "No browser (warning)")] + [(key, app["name"]) for key, app in APPS.items()
+                                                if app["category"] == "browser" and available(app)],
+                 "Choosing a new browser replaces the current default. Add another explicitly below."),
+                ("game_mode", "Dedicated session", GAME_MODES,
+                 "Desktop only has no gaming requirement. Other modes explicitly select native Steam and Gamescope."),
+                ("pin_selected", "Pin selected applications", bool, "Individual pin choices appear beneath selected applications. Failed apps and Steam bootstrappers are never pinned."),
+                ("pin_core", "Pin core desktop tools", bool, "Pin file manager, terminal, settings and software manager on first login only."),
+                ("package_search", "Search applications", None, "Filter by name or description."),
+            ]
+            query = s.package_search.casefold().strip()
+            for key, category in CATALOG["categories"].items():
+                entries = [app for app in APPS.values() if app["category"] == key and
+                           query in (app["name"] + " " + app["description"]).casefold()]
+                if not entries:
+                    continue
+                result.append(("category:" + key, category["title"], bool, "Expand or collapse category."))
+                if key not in self.expanded and not query:
+                    continue
+                result.extend([
+                    ("all:" + key, "  Select All", [], "Select available choices in this category."),
+                    ("none:" + key, "  Deselect All", [], "Clear category choices, keeping the default browser."),
+                ])
+                for app in entries:
+                    identity = app["id"]
+                    methods = [(method, spec["source"]) for method, spec in app["methods"].items()]
+                    reason = app["reason"] if app["desktop"] != "gnome" else "Requires GNOME Shell."
+                    options = ([("", "[ ] Off")] + [(method, "[x] " + label) for method, label in methods]
+                               if available(app) else [])
+                    if identity == s.browser:
+                        options = [option for option in options if option[0]]
+                    specs = app["methods"].get(s.packages.get(identity) or next(iter(app["methods"]), ""), {})
+                    deps = (specs.get("packages") or []) + app["extra"]
+                    hint = reason or app["description"] + " " + ", ".join(deps)
+                    label = "  " + app["name"]
+                    if identity == s.browser:
+                        label += " (default)"
+                    elif app["recommended"]:
+                        label += " (recommended)"
+                    result.append(("app:" + identity, label, options, hint))
+                    if identity in s.packages and s.pin_selected:
+                        result.append(("pin:" + identity, "    Pin " + app['name'], bool, "Applies only after verified installation; later desktop customization is preserved."))
+            return result
+        return []
+
+    def errors(self, page=None):
+        s, issues = self.settings, []
+        if not re.fullmatch(r"[A-Za-z0-9_+\-]*", s.variant):
+            issues.append((0, "Keyboard variant contains unsupported characters"))
+        if not s.automatic_time:
+            try:
+                datetime.strptime(s.manual_time, "%Y-%m-%d %H:%M")
+            except ValueError:
+                issues.append((1, "Manual date/time must be YYYY-MM-DD HH:MM"))
+        if s.automatic_time and any(not re.fullmatch(r"[A-Za-z0-9_.:\-]+", host) for host in s.ntp_servers.split()):
+            issues.append((1, "NTP servers must be hostnames or IP addresses"))
+        disk = self.disk()
+        if not self.snapshot.verified or not disk or disk.blocked:
+            issues.append((2, "Choose an available target disk; boot-drive protection must be verified"))
+        if not self.demo and s.mode != "erase":
+            issues.append((2, "The terminal installer supports Erase disk only"))
+        if not self.demo and s.encryption:
+            issues.append((2, "Disk encryption is unavailable in the terminal installer"))
+        if s.immutable and (not self.allow_immutable or s.filesystem != 'btrfs' or s.mode != 'erase'):
+            issues.append((2, "Transactional installation requires the development option, Btrfs and Erase disk"))
+        if s.immutable and disk and disk.size < 32 * 1024**3:
+            issues.append((2, "Transactional installations require at least 32 GiB"))
+        if s.mode in ("replace", "alongside") and (not disk or s.partition not in disk.partitions):
+            issues.append((2, "Choose an existing partition on the selected disk"))
+        if not re.fullmatch(r"[a-z_][a-z0-9_\-]{0,31}", s.username):
+            issues.append((3, "Enter a valid lowercase username"))
+        if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?", s.hostname):
+            issues.append((3, "Enter a valid computer name (1-63 letters, digits or hyphens)"))
+        if ":" in s.full_name:
+            issues.append((3, "Your name cannot contain a colon"))
+        if not s.password:
+            issues.append((3, "Enter a password"))
+        if s.password != s.confirmation:
+            issues.append((3, "Passwords do not match"))
+        return [message for number, message in issues if page is None or page == number]
+
+    def next(self):
+        issues = self.errors(self.page)
+        if issues:
+            self.message = issues[0]
+        else:
+            self.page, self.focus = min(5, self.page + 1), 0
+
+    def value(self, name):
+        kind, _, key = name.partition(":")
+        if kind == "app":
+            return self.settings.packages.get(key, "")
+        if kind == 'pin':
+            return key in self.settings.pins
+        if kind == "category":
+            return key in self.expanded or bool(self.settings.package_search.strip())
+        if kind in ("all", "none"):
+            return ""
+        return getattr(self.settings, name)
+
+    def set_value(self, name, value):
+        settings = self.settings
+        kind, _, key = name.partition(":")
+        if kind == "category":
+            if value:
+                self.expanded.add(key)
+            else:
+                self.expanded.discard(key)
+            return
+        if kind == 'pin':
+            (settings.pins.add if value else settings.pins.discard)(key)
+            return
+        if kind in ("all", "none"):
+            for app in APPS.values():
+                identity = app["id"]
+                if app["category"] == key and available(app) and identity != settings.browser:
+                    if kind == "all":
+                        settings.packages.setdefault(identity, next(iter(app["methods"])))
+                    else:
+                        settings.packages.pop(identity, None)
+        elif kind == "app":
+            if value:
+                settings.packages[key] = value
+            elif key != settings.browser:
+                settings.packages.pop(key, None)
+        elif name == "package_preset":
+            settings.packages = preset(value, self.metadata)
+            settings.browser, settings.game_mode = "firefox", "off"
+            self.session_owned.clear()
+            settings.package_preset = value
+        elif name == "browser":
+            if value is None:
+                for app_id in list(settings.packages):
+                    if APPS[app_id]['category'] == 'browser':
+                        settings.packages.pop(app_id)
+            elif value not in settings.packages:
+                settings.packages.pop(settings.browser, None)
+                settings.packages[value] = next(iter(APPS[value]["methods"]))
+            settings.browser = value
+            if value:
+                settings.pins.add(value)
+        elif name == 'immutable':
+            settings.immutable = bool(value)
+            if value:
+                settings.filesystem = 'btrfs'
+        elif name == "game_mode":
+            if value == "off":
+                for app_id in self.session_owned:
+                    settings.packages.pop(app_id, None)
+                self.session_owned.clear()
+            elif settings.game_mode == "off":
+                self.session_owned = {"steam", "gamescope"} - settings.packages.keys()
+                settings.packages.update(steam="apt", gamescope="apt")
+            settings.game_mode = value
+        else:
+            setattr(settings, name, value)
+        if kind in ("app", "all", "none") or name in ("browser", "game_mode"):
+            settings.package_preset = "Custom"
+            if settings.game_mode != "off" and not {"steam", "gamescope"} <= settings.packages.keys():
+                for app_id in self.session_owned:
+                    settings.packages.pop(app_id, None)
+                self.session_owned.clear()
+                settings.game_mode = "off"
+        if name in ("disk", "mode"):
+            settings.partition = ""
+        if kind == 'app' and value and settings.pin_selected:
+            settings.pins.add(key)
+        settings.pins.intersection_update(settings.packages)
+        self.focus = min(self.focus, len(self.fields()) + 3)
+
+    def estimate(self):
+        known = {}
+        unknown = 0
+        for key, method in self.settings.packages.items():
+            entry = self.metadata.get(key, {}).get(method, {}).get("packages")
+            if entry is None:
+                unknown += 1
+            else:
+                known.update(entry)
+        download = sum(size[0] for size in known.values()) / 1048576
+        installed = sum(size[1] for size in known.values()) / 1048576
+        source = self.metadata_date or "no snapshot"
+        shared = " + shared runtimes unknown" if "flatpak" in self.settings.packages.values() else ""
+        return f"{download:.1f} MiB download / {installed:.1f} MiB installed known ({source}); {unknown} unknown{shared}"
+
+    def activate(self):
+        fields = self.fields()
+        if self.focus < len(fields):
+            name, label, options, _hint = fields[self.focus]
+            value = self.value(name)
+            if name.startswith(("all:", "none:")):
+                self.set_value(name, True)
+            elif name.startswith("app:") and not options:
+                self.message = _hint
+            elif options is bool:
+                self.set_value(name, not value)
+            elif options is not None:
+                if not options:
+                    self.message = "No selectable entries. On Storage, F5 refreshes the protected disk list."
+                    return
+                self.choices = (name, label, options)
+                self.filter = ""
+                self.choice_index = next((i for i, pair in enumerate(options) if pair[0] == value), 0)
+            else:
+                self.editing, self.buffer, self.cursor = name, value, len(value)
+        else:
+            button = self.focus - len(fields)
+            if button == 0:
+                self.page, self.focus = max(0, self.page - 1), 0
+            elif button == 1:
+                self.next()
+            elif button == 2:
+                self.primary_action()
+            else:
+                self.quit_dialog = True
+
+    def primary_action(self):
+        self.page, self.focus = 5, 2
+        if self.demo:
+            self.save()
+        else:
+            self.review_install()
+
+    def package_selection(self):
+        s = self.settings
+        return validate({"version": CATALOG["version"], "apps": s.packages,
+                         "session": s.game_mode, "browser": s.browser,
+                         "pins": {"enabled": True, "core": s.pin_core,
+                                  "apps": sorted(s.pins & s.packages.keys()) if s.pin_selected else []}})
+
+    def plan(self):
+        s = self.settings
+        return {"schema": "aphrodite-os.terminal-setup/2", "installation_enabled": False,
+                "demo": self.demo, "created_at": datetime.now(timezone.utc).isoformat(),
+                "welcome": {"locale": s.language, "keyboard": s.keyboard, "variant": s.variant},
+                "time": {"timezone": s.timezone, "ntp": s.automatic_time,
+                         "servers": s.ntp_servers.split() if s.automatic_time else [],
+                         "manual_local_time": None if s.automatic_time else s.manual_time,
+                         "twelve_hour": s.twelve_hour},
+                "storage": {"disk": s.disk, "observed_device_id": self.disk().number if self.disk() else None,
+                            "transactional_development": s.immutable,
+                            "observation": self.snapshot.observed, "mode": s.mode,
+                            "partition": s.partition or None, "filesystem": s.filesystem,
+                            "encryption": "luks1" if s.encryption else None, "swap": s.swap,
+                            "backend_revalidation_required": True},
+                "account": {"full_name": s.full_name, "username": s.username,
+                            "automatic_login": s.autologin,
+                            "hostname": s.hostname, "root_locked": True,
+                            "password_required_at_install": True},
+                "packages": self.package_selection()}
+
+    def save(self):
+        issues = self.errors()
+        if issues:
+            self.message = "Plan not saved: " + issues[0]
+            return
+        path = Path(self.output).expanduser() if self.output else Path.home() / datetime.now().strftime("aphrodite-os-plan-%Y%m%d-%H%M%S.json")
+        try:
+            # No overwrite or symlink traversal at the final filename.
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(self.plan(), stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+            self.message = f"Saved {path}. Passwords omitted. No OS has been installed."
+        except OSError as error:
+            self.message = f"Plan not saved: {error.strerror or type(error).__name__}"
+
+    def filtered_choices(self):
+        return [pair for pair in self.choices[2] if self.filter.casefold() in pair[1].casefold()]
+
+    def key(self, key):
+        if self.installing or self.finished:
+            if self.reboot_dialog:
+                if key in ("y", "Y"):
+                    self.confirm_restart()
+                elif key in ("n", "N", "ESC"):
+                    self.reboot_dialog = False
+                return
+            if (self.finished or self.demo) and not self.panels.searching and key in ("q", "Q", "ESC"):
+                self.done = True
+            elif self.installing and not self.panels.searching and key in ("q", "Q", "ESC"):
+                self.panels.message = "Installation is active. Keep this terminal open; panels and logs remain available."
+            else:
+                self.panels.key(key)
+                if self.panels.copy or self.panels.save:
+                    self.log_action(copy=self.panels.copy)
+                    self.panels.copy = self.panels.save = False
+                if self.panels.restart:
+                    self.restart()
+                    self.panels.restart = False
+            return
+        if self.install_confirmation:
+            if key == "ESC":
+                self.install_confirmation, self.buffer = None, ""
+            elif key == "ENTER":
+                self.start_install()
+            elif key == "BACKSPACE":
+                self.buffer = self.buffer[:-1]
+            elif len(key) == 1 and key.isprintable() and len(self.buffer) < 100:
+                self.buffer += key
+            return
+        if self.quit_dialog:
+            if key in ("y", "Y"):
+                self.done = True
+            elif key in ("n", "N", "ESC"):
+                self.quit_dialog = False
+            return
+        if self.choices:
+            pairs = self.filtered_choices()
+            if key == "ESC":
+                self.choices = None
+            elif key == "ENTER" and pairs:
+                self.set_value(self.choices[0], pairs[self.choice_index][0])
+                self.choices = None
+            elif key in ("UP", "DOWN") and pairs:
+                self.choice_index = (self.choice_index + (1 if key == "DOWN" else -1)) % len(pairs)
+            elif key == "BACKSPACE":
+                self.filter, self.choice_index = self.filter[:-1], 0
+            elif len(key) == 1 and key.isprintable():
+                self.filter, self.choice_index = (self.filter + key)[:80], 0
+            return
+        if self.editing:
+            if key == "ESC":
+                self.editing, self.buffer = None, ""
+            elif key == "ENTER":
+                self.set_value(self.editing, self.buffer)
+                self.editing, self.buffer = None, ""
+            elif key == "BACKSPACE" and self.cursor:
+                self.buffer = self.buffer[:self.cursor - 1] + self.buffer[self.cursor:]
+                self.cursor -= 1
+            elif key == "DELETE":
+                self.buffer = self.buffer[:self.cursor] + self.buffer[self.cursor + 1:]
+            elif key == "LEFT":
+                self.cursor = max(0, self.cursor - 1)
+            elif key == "RIGHT":
+                self.cursor = min(len(self.buffer), self.cursor + 1)
+            elif key == "HOME":
+                self.cursor = 0
+            elif key == "END":
+                self.cursor = len(self.buffer)
+            elif key == "CLEAR":
+                self.buffer, self.cursor = "", 0
+            elif len(key) == 1 and key.isprintable() and len(self.buffer) < 256:
+                self.buffer = self.buffer[:self.cursor] + key + self.buffer[self.cursor:]
+                self.cursor += 1
+            return
+        if key in ("RIGHT", "LEFT"):
+            self.page = (self.page + (1 if key == "RIGHT" else -1)) % 6
+            self.focus = 0
+        elif key in ("UP", "BTAB"):
+            self.focus = (self.focus - 1) % (len(self.fields()) + 4)
+        elif key in ("DOWN", "TAB"):
+            self.focus = (self.focus + 1) % (len(self.fields()) + 4)
+        elif key in ("ENTER", " "):
+            self.activate()
+        elif key in "123456" and len(key) == 1:
+            self.page, self.focus = int(key) - 1, 0
+        elif key in ("n", "N"):
+            self.next()
+        elif key in ("b", "B", "ESC"):
+            self.page, self.focus = max(0, self.page - 1), 0
+        elif key in ("q", "Q"):
+            self.quit_dialog = True
+        elif key == "F2":
+            self.primary_action()
+        elif key == "F5":
+            self.refresh()
+
+
+def width_of(text):
+    return sum(0 if unicodedata.combining(char) else 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+               for char in str(text) if char.isprintable())
+
+
+class Canvas:
+    def __init__(self, width, height):
+        self.width, self.height = width, height
+        self.cells = [[(" ", 0) for _ in range(width)] for _ in range(height)]
+
+    def put(self, y, x, text, style=0, limit=None):
+        if not 0 <= y < self.height:
+            return
+        end = self.width if limit is None else min(self.width, x + limit)
+        for char in str(text):
+            if not char.isprintable():
+                char = " "
+            if unicodedata.combining(char):
+                if 0 < x <= end:
+                    old, old_style = self.cells[y][x - 1]
+                    self.cells[y][x - 1] = (old + char, old_style)
+                continue
+            size = 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+            if x < 0 or x + size > end:
+                break
+            self.cells[y][x] = (char, style)
+            if size == 2:
+                self.cells[y][x + 1] = ("", style)
+            x += size
+
+    def box(self, y, x, height, width, style=1):
+        self.put(y, x, "+" + "-" * (width - 2) + "+", style)
+        self.put(y + height - 1, x, "+" + "-" * (width - 2) + "+", style)
+        for row in range(y + 1, y + height - 1):
+            self.put(row, x, "|" + " " * (width - 2) + "|", style)
+
+    def spans(self, y):
+        start, style, text = 0, self.cells[y][0][1], ""
+        for x, (char, color) in enumerate(self.cells[y]):
+            if color != style:
+                yield start, text, style
+                start, text, style = x, "", color
+            text += char
+        yield start, text, style
+
+    def text(self, color=False):
+        ansi = ("\033[38;5;252;48;5;235m", "\033[38;5;218;48;5;235m", "\033[38;5;245;48;5;235m",
+                "\033[38;5;235;48;5;218m", "\033[38;5;221;48;5;235m", "\033[38;5;114;48;5;235m")
+        return "\n".join("".join((ansi[style] if color else "") + text for _, text, style in self.spans(y))
+                         + ("\033[0m" if color else "") for y in range(self.height))
+
+
+def render(app, width=100, height=30):
+    c = Canvas(max(1, width), max(1, height))
+    if app.installing or app.finished:
+        c.box(0, 0, height, width)
+        c.put(1, 3, "A  Aphrodite OS 0 (infant)  /  Installation", 1, width - 6)
+        draw_progress(app.panels, c, app.log_path, app.demo)
+        if app.reboot_dialog and width >= 60 and height >= 18:
+            c.box(height // 2 - 2, 3, 5, width - 6)
+            c.put(height // 2 - 1, 5, "Restart now? Remove the live medium when the system shuts down.", 4, width - 10)
+            c.put(height // 2 + 1, 5, "[y] Restart System   [n / Esc] Stay", 1, width - 10)
+        return c
+    if width < 78 or height < 22:
+        c.put(0, 0, "Please enlarge the terminal to at least 80 columns x 24 rows.", 4)
+        c.put(2, 0, "Your choices are kept. Press q, then y to leave.")
+        return c
+    c.box(0, 0, height, width)
+    c.put(1, 3, "A  Aphrodite OS 0 (infant)  /  Terminal setup", 1)
+    badge = "DEMO / NO DISK WRITES" if app.demo else "LIVE INSTALLER"
+    c.put(1, width - len(badge) - 3, badge, 4)
+    c.put(2, 1, "-" * (width - 2), 2)
+    x = 3
+    for i, label in enumerate(TABS):
+        tab = f" {i + 1} {label} "
+        c.put(3, x, tab, 3 if app.page == i else 2)
+        x += len(tab) + 1
+    c.put(4, 1, "-" * (width - 2), 2)
+    c.put(5, 3, TITLES[app.page], 1)
+    subtitles = ("Choose target language and keyboard settings.", "Set your timezone and clock preferences.",
+                 "Choose the target disk and filesystem.",
+                 "Root stays locked. Your account will use sudo.",
+                 app.estimate(),
+                 "Review your settings before confirming installation.")
+    c.put(6, 3, subtitles[app.page], 2, width - 6)
+    fields = app.fields()
+    row = 8
+    if app.page == 2 and height >= 28:
+        c.put(row, 3, "DEVICE                 SIZE        MODEL / STATUS", 2)
+        for disk in app.snapshot.disks[:3]:
+            row += 1
+            mark = ">" if disk.path == app.settings.disk else " "
+            c.put(row, 3, f"{mark} {disk.path:<23} {size_text(disk.size):>10}  {disk.blocked or disk.model}",
+                  2 if disk.blocked else 5, width - 6)
+        row += 2
+    capacity = max(1, height - 8 - row)
+    start = max(0, min(len(fields) - capacity, app.focus - capacity + 1))
+    for i, (name, label, choices, _hint) in enumerate(fields[start:start + capacity], start):
+        value = app.buffer if app.editing == name else app.value(name)
+        if name in ("password", "confirmation"):
+            shown = "*" * min(24, len(value)) if value else "(not set)"
+        elif choices is bool:
+            shown = "[x] Yes" if value else "[ ] No"
+        elif name.startswith(("all:", "none:")):
+            shown = "[Enter]"
+        elif name.startswith("app:") and not choices:
+            shown = "[unavailable]"
+        elif choices is not None:
+            shown = next((label for stored, label in choices if stored == value), str(value) or "(choose)")
+        else:
+            shown = value or "(leave blank)"
+        if row < height - 8:
+            c.put(row, 3, " " * (width - 6), 3 if app.focus == i else 0)
+            c.put(row, 4, f"{label:<23} {shown}", 3 if app.focus == i else 0, width - 8)
+        row += 1
+    if app.page == 1 and row < height - 8:
+        s = app.settings
+        try:
+            if s.automatic_time:
+                from zoneinfo import ZoneInfo
+                now = datetime.now(ZoneInfo(s.timezone))
+            else:
+                now = datetime.strptime(s.manual_time, "%Y-%m-%d %H:%M")
+            clock = now.strftime("%Y-%m-%d %I:%M %p" if s.twelve_hour else "%Y-%m-%d %H:%M")
+        except (ImportError, KeyError, ValueError):
+            clock = "Unavailable for this timezone/date"
+        c.put(row + 1, 4, "Clock preview: " + clock, 2, width - 8)
+    if app.page == 5:
+        s = app.settings
+        package_summary = ", ".join(APPS[key]["name"] for key in s.packages)
+        lines = [("Welcome", f"{s.language}  /  keyboard {s.keyboard}"),
+                 ("Time", f"{s.timezone}  /  {'automatic NTP' if s.automatic_time else s.manual_time}"),
+                 ("Storage", f"{s.disk or '(not selected)'}  /  {s.mode}  /  {s.filesystem}" + (" / TRANSACTIONAL DEVELOPMENT" if s.immutable else '')),
+                 ("Account", f"{s.username or '(not set)'}@{s.hostname}" + (' / automatic login' if s.autologin else ' / password login')),
+                 ("Packages", package_summary),
+                 ("Session", dict(GAME_MODES)[s.game_mode])]
+        for offset, (name, value) in enumerate(lines):
+            c.put(8 + offset, 4, f"{name:<12} {value}", 0, width - 8)
+        issues = app.errors()
+        review = issues[0] if issues else ("Ready to save a demo plan." if app.demo
+                                            else "Ready to confirm installation.")
+        if not issues and s.browser is None:
+            review = 'WARNING: No browser selected; no browser will be installed.'
+        c.put(14, 4, review, 4 if issues or s.browser is None else 5, width - 8)
+    action = "Save plan" if app.demo else "Install"
+    hint = fields[app.focus][3] if app.focus < len(fields) else f"F2 opens {action}."
+    c.put(height - 7, 3, hint, 2, width - 6)
+    status = app.snapshot.message if app.page == 2 and not app.snapshot.verified else app.message
+    c.put(height - 6, 3, status, 4, width - 6)
+    c.put(height - 5, 1, "-" * (width - 2), 2)
+    x = 3
+    for i, label in enumerate(("Back", "Next", action, "Quit")):
+        c.put(height - 4, x, f"[ {label} ]", 3 if app.focus == len(fields) + i else 1)
+        x += len(label) + 7
+    c.put(height - 2, 3, f"Tab focus | <- -> tabs | Enter edit | F2 {action.lower()} | F5 disks | q quit", 2, width - 6)
+    if app.editing:
+        c.put(height - 2, 3, "Type value | Enter apply | Esc cancel | Ctrl-U clear".ljust(width - 6), 1, width - 6)
+    if app.choices:
+        pairs = app.filtered_choices()
+        box_height, box_width = min(height - 4, max(9, len(pairs) + 6)), min(width - 6, 76)
+        top, left = (height - box_height) // 2, (width - box_width) // 2
+        c.box(top, left, box_height, box_width)
+        c.put(top + 1, left + 2, "Choose " + app.choices[1], 1, box_width - 4)
+        c.put(top + 2, left + 2, "Filter: " + app.filter, 0, box_width - 4)
+        count = box_height - 6
+        start = max(0, app.choice_index - count + 1)
+        if not pairs:
+            c.put(top + 4, left + 2, "No matches. Backspace edits the filter.", 4, box_width - 4)
+        for i, pair in enumerate(pairs[start:start + count], start):
+            c.put(top + 4 + i - start, left + 2, ("> " if i == app.choice_index else "  ") + pair[1],
+                  3 if i == app.choice_index else 0, box_width - 4)
+        c.put(top + box_height - 2, left + 2, "Up/Down choose | type to filter | Enter apply | Esc cancel", 2, box_width - 4)
+    if app.install_confirmation:
+        disk = app.install_confirmation
+        top, left, box_width = height // 2 - 5, 3, width - 6
+        c.box(top, left, 10, box_width)
+        lines = [
+            f"Erase {disk.path}  {size_text(disk.size)}  {disk.model}  ({disk.number})",
+            "All partitions, files and existing operating systems will be lost.",
+            f"Write a new GPT, format {app.settings.filesystem}, install aphrodite-os and GRUB.",
+            ("Create a 2 GiB swap file. " if app.settings.swap == "file" else "")
+            + "UEFI installs also register the bootloader in firmware.",
+            ("Automatic network time." if app.settings.automatic_time
+             else "Manual time will also change the live system clock and RTC."),
+            f"Type ERASE {disk.path} and press Enter. Esc cancels.",
+            "> " + app.buffer,
+        ]
+        if app.settings.immutable:
+            lines.insert(3, 'DEVELOPMENT: 2 GiB boot partition + read-only Btrfs deployments and persistent data.')
+        for index, line in enumerate(lines):
+            c.put(top + 1 + index, left + 2, line, 4 if index < 2 else 0, box_width - 4)
+    if app.quit_dialog:
+        top, left, box_width = height // 2 - 2, 6, width - 12
+        c.box(top, left, 5, box_width)
+        c.put(top + 1, left + 2, "Leave terminal setup? Unsaved choices will be lost.", 4, box_width - 4)
+        c.put(top + 3, left + 2, "[y] Leave   [n] Stay", 1)
+    return c
+
+
+def interactive(screen, app):
+    import curses
+    import select
+
+    terminal_io = select.poll()
+    terminal_io.register(sys.stdin, select.POLLHUP | select.POLLERR)
+    screen.keypad(True)
+    screen.timeout(250)
+    try:
+        curses.mousemask(curses.BUTTON1_CLICKED | curses.BUTTON4_PRESSED | getattr(curses, "BUTTON5_PRESSED", 0))
+    except curses.error:
+        pass
+    try:
+        curses.curs_set(0)
+    except curses.error:
+        pass
+    attrs = [0, curses.A_BOLD, curses.A_DIM, curses.A_REVERSE, curses.A_BOLD, 0]
+    if curses.has_colors():
+        try:
+            curses.use_default_colors()
+            default_background = -1
+        except curses.error:
+            default_background = curses.COLOR_BLACK
+        colors = [(252, 235), (218, 235), (245, 235), (235, 218), (221, 235), (114, 235)] if curses.COLORS >= 256 else [
+            (curses.COLOR_WHITE, default_background), (curses.COLOR_MAGENTA, default_background), (curses.COLOR_CYAN, default_background),
+            (curses.COLOR_BLACK, curses.COLOR_MAGENTA), (curses.COLOR_YELLOW, default_background), (curses.COLOR_GREEN, default_background)]
+        for i, pair in enumerate(colors, 1):
+            curses.init_pair(i, *pair)
+        attrs = [curses.color_pair(i + 1) for i in range(6)]
+    app.refresh()
+    app.load_zones()
+    keymap = {curses.KEY_LEFT: "LEFT", curses.KEY_RIGHT: "RIGHT", curses.KEY_UP: "UP",
+              curses.KEY_DOWN: "DOWN", curses.KEY_BTAB: "BTAB", curses.KEY_BACKSPACE: "BACKSPACE",
+              curses.KEY_DC: "DELETE", curses.KEY_HOME: "HOME", curses.KEY_END: "END",
+              curses.KEY_ENTER: "ENTER", curses.KEY_F2: "F2", curses.KEY_F5: "F5",
+              curses.KEY_F6: "F6", curses.KEY_PPAGE: "PGUP", curses.KEY_NPAGE: "PGDN"}
+    previous = {}
+    while not app.done:
+        app.poll()
+        height, width = screen.getmaxyx()
+        screen.timeout(40 if app.panels.transition and not app.panels.reduced_motion else 250)
+        canvas = render(app, max(1, width - 1), max(1, height - 1))
+        for y in range(canvas.height):
+            spans = tuple(canvas.spans(y))
+            if previous.get(y) == spans:
+                continue
+            previous[y] = spans
+            for x, text, style in spans:
+                try:
+                    screen.addstr(y, x, text, attrs[style])
+                except curses.error:
+                    pass  # A resize may land between geometry and drawing.
+        screen.refresh()
+        if app.clipboard:
+            # OSC 52 asks the user's terminal to copy text; it does not require
+            # privileged access to the live user's Wayland clipboard socket.
+            sys.stdout.write("\033]52;c;" + app.clipboard + "\a")
+            sys.stdout.flush()
+            app.clipboard = None
+        try:
+            key = screen.get_wch()
+        except curses.error:
+            if terminal_io.poll(0):
+                app.done = True
+            continue
+        if key == curses.KEY_RESIZE:
+            screen.erase()
+            previous.clear()
+            continue
+        if key == curses.KEY_MOUSE:
+            try:
+                _, x, y, _, buttons = curses.getmouse()
+                if app.installing or app.finished:
+                    action = app.panels.hits.get(y)
+                    if isinstance(action, list):
+                        action = next((key for left, right, key in action if left <= x < right), None)
+                    if buttons & curses.BUTTON1_CLICKED and action:
+                        app.panels.searching = False
+                        app.key(action)
+                    elif buttons & curses.BUTTON4_PRESSED:
+                        app.key("PGUP")
+                    elif buttons & getattr(curses, "BUTTON5_PRESSED", 0):
+                        app.key("PGDN")
+            except curses.error:
+                pass
+            continue
+        key = keymap.get(key, key)
+        key = {"\n": "ENTER", "\r": "ENTER", "\t": "TAB", "\x1b": "ESC",
+               "\x7f": "BACKSPACE", "\b": "BACKSPACE", "\x15": "CLEAR"}.get(key, key)
+        if isinstance(key, str):
+            app.key(key)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--demo", action="store_true", help="Use visibly synthetic disks; never probe hardware")
+    parser.add_argument("--preview", action="store_true", help="Print a non-interactive ASCII frame; requires --demo")
+    parser.add_argument("--page", choices=[name.lower() for name in TABS], default="welcome")
+    parser.add_argument("--color", action="store_true", help="Use ANSI colors in --preview output")
+    parser.add_argument("--output", help="New JSON plan path; existing files are never overwritten")
+    parser.add_argument("--progress-preview", action="store_true", help="Demo-only progress layout; never runs installation")
+    parser.add_argument("--motion", action="store_true", help="Enable brief panel transitions; default is reduced motion")
+    parser.add_argument("--experimental-immutable", action="store_true", help="Expose the Btrfs transactional development installation; validate in a disposable VM")
+    options = parser.parse_args(argv)
+    if options.preview and not options.demo:
+        parser.error("--preview requires --demo so a screenshot cannot be mistaken for a real disk scan")
+    if options.output and not options.demo:
+        parser.error("--output is available in demo mode")
+    if options.progress_preview and not options.demo:
+        parser.error("--progress-preview requires --demo")
+    if not options.demo and (os.geteuid() or os.environ.get("APHRODITE_OS_PRIVATE_MOUNTS") != "1"
+                             or not backend.IMAGE.is_file()):
+        parser.error("Start the live installer with install-aphrodite-os")
+    app = App(options.demo, options.output)
+    app.allow_immutable = options.experimental_immutable
+    app.panels.reduced_motion = not options.motion
+    if options.progress_preview:
+        app.installing = True
+        app.progress.begin({})
+        app.progress.consume({"kind": "stage", "id": "preflight", "text": "DEMO layout; no installation is running"})
+    app.page = [name.lower() for name in TABS].index(options.page)
+    if options.preview:
+        print(render(app).text(options.color))
+        return 0
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        print("Use a real terminal, or use --demo --preview for a static preview.", file=sys.stderr)
+        return 2
+    if not options.demo:
+        try:
+            app.log_path = backend.new_log()
+        except OSError as error:
+            print(f"Cannot create the installer log: {error}", file=sys.stderr)
+            return 2
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        import curses
+        curses.wrapper(interactive, app)
+    except ImportError:
+        print("Interactive mode needs Python curses on Linux. Static preview: --demo --preview", file=sys.stderr)
+        return 2
+    except curses.error:
+        print("This terminal could not be initialized. Try a normal Debian terminal, or --demo --preview.", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        pass
+    finally:
+        app.settings.password = app.settings.confirmation = ""
+        app.buffer = ""
+    return app.exit_status
+
+
+if __name__ == "__main__":
+    sys.exit(main())

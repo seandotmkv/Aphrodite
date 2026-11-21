@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+cd -- "$(dirname -- "$0")/.."
+
+exec 9> .aphrodite-os-build.lock
+flock -n 9 || { echo 'A aphrodite-os build is already running.' >&2; exit 1; }
+if pgrep -af '[l]b (build|clean|chroot|binary|bootstrap)' >/dev/null; then
+    echo 'An existing live-build process is active. Wait for it to finish.' >&2
+    pgrep -af '[l]b (build|clean|chroot|binary|bootstrap)' >&2
+    exit 1
+fi
+if findmnt -rn -o TARGET | awk -v root="$PWD" '
+    $0 == root "/chroot" || index($0, root "/chroot/") == 1 ||
+    $0 == root "/binary" || index($0, root "/binary/") == 1 { print; found=1 }
+    END { exit !found }
+'; then
+    echo 'A mount remains under the build tree. Inspect it before cleaning.' >&2
+    exit 1
+fi
+
+# Exercise source protection before a privileged rebuild or ISO replacement.
+python3 -m unittest discover -s tests -v
+
+backup="$HOME/aphrodite-os-0-known-working.iso"
+if [ ! -s "$backup" ]; then
+    # Preserve the prior image on the first build after the name migration.
+    for previous in aphrodite-os-0-amd64.iso "$HOME/sean-os-0-known-working.iso" sean-os-0.iso; do
+        if [ -s "$previous" ]; then
+            cp --reflink=auto -- "$previous" "$backup"
+            cmp -- "$previous" "$backup"
+            break
+        fi
+    done
+fi
+sudo -v
+if [ -d chroot/var/cache/apt/archives ]; then
+    sudo mkdir -p cache/packages.chroot
+    sudo find chroot/var/cache/apt/archives -maxdepth 1 -type f -name '*.deb' \
+        -exec cp -n -t cache/packages.chroot -- {} +
+fi
+sudo lb clean --all
+lb config
+sudo lb build 2>&1 | tee build.log
+
+./scripts/verify-release
+./scripts/export-update-release
+sha256sum aphrodite-os-0-amd64.iso aphrodite-os-0-amd64.packages aphrodite-os-0-amd64.target.packages > aphrodite-os-0.sha256
+export_dir=${APHRODITE_OS_EXPORT_DIR:-${SEAN_OS_EXPORT_DIR:-/mnt/c/Users/sean/Downloads}}
+test -d "$export_dir"
+for file in aphrodite-os-0-amd64.iso aphrodite-os-0-amd64.packages aphrodite-os-0-amd64.target.packages aphrodite-os-0.sha256; do
+    temp=$(mktemp "$export_dir/.${file}.XXXXXX")
+    cp -- "$file" "$temp"
+    cmp -- "$file" "$temp"
+    mv -f -- "$temp" "$export_dir/$file"
+done
+(cd "$export_dir" && sha256sum -c aphrodite-os-0.sha256)

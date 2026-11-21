@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+test ! -e /run/live/medium/live/filesystem.squashfs
+keep_firefox=true
+case "${1:-}" in
+    --remove-firefox) keep_firefox=false ;;
+    "") : ;;
+    *) echo 'Unsupported cleanup argument' >&2; exit 2 ;;
+esac
+# Save the list before dpkg removes this script and its package data.
+set --
+for package in $(cat /usr/share/aphrodite-os/live-only-packages); do
+    if [ "$package" = firefox-esr ] && [ "$keep_firefox" = true ]; then
+        continue
+    fi
+    if [ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null)" = installed ]; then
+        set -- "$@" "$package"
+    fi
+done
+if [ "$#" -ne 0 ]; then
+    export LC_ALL=C DEBIAN_FRONTEND=noninteractive
+    plan=$(apt-get -s --no-auto-remove purge "$@")
+    printf '%s\n' "$plan"
+    # Check both removals and package additions before touching the target.
+    printf '%s\n' "$plan" | awk -v allowed="$*" '
+        BEGIN { n = split(allowed, list, " "); for (i = 1; i <= n; i++) keep[list[i]] = 1 }
+        /^Inst / { exit 1 }
+        /^(Remv|Purg) / { sub(/:[^:]+$/, "", $2); if (!($2 in keep)) exit 1 }'
+    apt-get -y --no-download --no-auto-remove purge "$@"
+    apt-get check
+fi
+rm -f /etc/sddm.conf.d/99-live.conf

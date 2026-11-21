@@ -1,0 +1,86 @@
+#!/bin/sh
+set -eu
+# Resolve the source to the actual kernel block device and all physical
+# parents. Mask its disk and partitions in this mount namespace only.
+# Existing mounts remain usable for reading and copying the SquashFS.
+block_device() (
+    major_minor=$1
+    # /dev/block/MAJ:MIN is a udev convenience symlink, not a required
+    # kernel device node. Some live environments expose /dev/sr0 or /dev/sdX
+    # without these aliases. Match the kernel device ID against lsblk's
+    # normal device paths instead; never guess a disk from its name.
+    case "$major_minor" in
+        ''|*[!0-9:]*|:*|*:|*:*:*) exit 1 ;;
+        *:*) ;;
+        *) exit 1 ;;
+    esac
+    listing=$(lsblk -nrpo PATH,MAJ:MIN) || exit 1
+    source=$(printf '%s\n' "$listing" |
+        awk -v device="$major_minor" '$2 == device { print $1 }') || exit 1
+    # Reject absent, ambiguous, or stale entries before traversing parents.
+    test -b "$source" || exit 1
+    actual=$(stat -Lc '%Hr:%Lr' -- "$source") || exit 1
+    [ "$actual" = "$major_minor" ] || exit 1
+    printf '%s\n' "$source"
+)
+
+physical_disks() (
+    major_minor=$1
+    depth=$2
+    [ "$depth" -lt 16 ] || exit 1
+    source=$(block_device "$major_minor") || exit 1
+    ancestors=$(lsblk -snrpo PATH,TYPE "$source") || exit 1
+    disks=$(printf '%s\n' "$ancestors" | awk '$2 == "disk" || $2 == "rom" { print $1 }')
+    loops=$(printf '%s\n' "$ancestors" | awk '$2 == "loop" { print $1 }')
+    for loop in $loops; do
+        # The loop device retains the backing filesystem's device ID even
+        # when live-boot moves its mount and the original path is unavailable.
+        backing_device=$(losetup --list --noheadings --raw --output BACK-MAJ:MIN "$loop") || exit 1
+        backing_disks=$(physical_disks "$backing_device" "$((depth + 1))") || exit 1
+        disks="$disks $backing_disks"
+    done
+    for disk in $disks; do
+        printf '%s\n' "$disk"
+    done
+    [ -n "$disks" ]
+)
+
+mode=${1:-}
+case "$mode" in --identify|--mask) ;; *) exit 2 ;; esac
+
+major_minor=$(findmnt -rn -o MAJ:MIN --mountpoint /run/live/medium) || major_minor=
+if ! roots=$(physical_disks "$major_minor" 0); then
+    # Ventoy can hide its ISO mapping from both sysfs and dmsetup. Use its
+    # checksummed boot record to identify the real whole disk, then run the
+    # same normal ancestry and partition protection as a directly flashed USB.
+    if ! backing_id=$(/usr/bin/python3 /usr/libexec/aphrodite-os-ventoy-device "$major_minor") ||
+       ! roots=$(physical_disks "$backing_id" 0); then
+        printf '%s\n' "Unable to identify the disk backing the live system (device ${major_minor:-unknown}). The installer stopped to protect the boot drive." >&2
+        exit 1
+    fi
+fi
+if [ "$mode" = "--identify" ]; then
+    printf '%s\n' "$roots" | sort -u
+    exit 0
+fi
+devices=$(
+    for disk in $roots; do
+        lsblk -nrpo PATH "$disk" || exit 1
+    done
+)
+for disk in $roots; do
+    if ! printf '%s\n' "$devices" | grep -Fxq -- "$disk"; then
+        printf 'Protected disk %s disappeared before masking.\n' "$disk" >&2
+        exit 1
+    fi
+done
+devices=$(printf '%s\n' "$devices" | sort -u)
+for device in $devices; do
+    if ! test -b "$device"; then
+        printf 'Protected device %s is no longer a block device.\n' "$device" >&2
+        exit 1
+    fi
+done
+for device in $devices; do
+    mount --bind /dev/null "$device"
+done

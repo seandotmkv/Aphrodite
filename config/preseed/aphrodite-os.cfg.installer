@@ -1,0 +1,7 @@
+# Keep the Plasma environment copied from the live filesystem.
+d-i pkgsel/run_tasksel boolean false
+d-i apt-setup/non-free-firmware boolean true
+d-i netcfg/target_network_config select network-manager
+
+# Purge the live installer package's conffiles as well as its executables.
+d-i preseed/late_command string in-target dpkg --purge aphrodite-os-live-installer calamares-settings-debian calamares

@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+# Steam invokes this helper when it offers the desktop action.
+case "${1:-desktop}" in
+    desktop|plasma) exec /usr/games/steam -shutdown ;;
+    *) exit 1 ;;
+esac

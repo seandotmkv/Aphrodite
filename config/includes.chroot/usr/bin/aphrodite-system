@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+case "${1:-status}" in
+    status) exec /usr/bin/python3 /usr/lib/aphrodite/transactional.py status ;;
+    update|layer|rollback|retry-apps|release)
+        test "$(id -u)" -eq 0 || { echo 'Run this operation with sudo.' >&2; exit 1; }
+        exec /usr/bin/unshare --mount --propagation private /usr/bin/python3 /usr/lib/aphrodite/transactional.py "$@" ;;
+    *) echo 'Usage: aphrodite-system status|update|layer PACKAGE...|rollback [DEPLOYMENT]|retry-apps' >&2; exit 2 ;;
+esac

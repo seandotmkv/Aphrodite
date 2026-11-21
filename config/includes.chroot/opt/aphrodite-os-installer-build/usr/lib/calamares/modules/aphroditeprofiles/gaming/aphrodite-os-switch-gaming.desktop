@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Switch to Gaming Mode
+Comment=Sign out and select Gaming Mode at the login screen
+Exec=/usr/local/bin/aphrodite-os-switch-gaming
+Icon=input-gaming
+Terminal=false
+Categories=Game;
+OnlyShowIn=KDE;

@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+test -r /run/live/medium/live/filesystem.squashfs || exit 0
+state=${XDG_STATE_HOME:-"$HOME/.local/state"}/aphrodite-os
+mkdir -p "$state"
+test ! -e "$state/installer-shortcut-created" || exit 0
+desktop=$(xdg-user-dir DESKTOP)
+test -n "$desktop" && test "$desktop" != "$HOME" || desktop="$HOME/Desktop"
+mkdir -p "$desktop"
+launcher="$desktop/Install aphrodite-os.desktop"
+if [ ! -e "$launcher" ] && [ ! -L "$launcher" ]; then
+    install -m 0755 /usr/share/applications/install-aphrodite-os.desktop "$launcher"
+    if command -v gio >/dev/null; then
+        gio set "$launcher" metadata::trusted true 2>/dev/null || :
+    fi
+fi
+touch "$state/installer-shortcut-created"

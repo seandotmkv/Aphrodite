@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+case "$*" in ""|--experimental-immutable) : ;; *) exit 2 ;; esac
+test "$(id -u)" -eq 0
+if ! test -r /run/live/medium/live/filesystem.squashfs; then
+    echo "The live installation image is unavailable." >&2
+    exit 1
+fi
+cd /
+umask 022
+export TERM=${TERM:-xterm-256color}
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+exec flock -n -F /run/lock/aphrodite-os-installer.lock \
+    /usr/bin/unshare --mount --propagation private \
+    /usr/bin/env APHRODITE_OS_PRIVATE_MOUNTS=1 /usr/bin/aphrodite-os-installer-tui "$@"

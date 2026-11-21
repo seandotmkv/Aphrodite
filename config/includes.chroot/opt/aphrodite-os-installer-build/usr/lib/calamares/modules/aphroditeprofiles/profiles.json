@@ -1,0 +1,22 @@
+{
+  "gaming": [
+    "vulkan-tools",
+    "libgamemodeauto0:i386",
+    "mangohud:i386"
+  ],
+  "resolve_common": [
+    "clinfo",
+    "ocl-icd-libopencl1",
+    "libapr1t64",
+    "libaprutil1t64",
+    "libasound2t64",
+    "libglib2.0-0t64",
+    "libxcb-cursor0"
+  ],
+  "resolve_amd": [
+    "mesa-opencl-icd"
+  ],
+  "resolve_intel": [
+    "intel-opencl-icd"
+  ]
+}

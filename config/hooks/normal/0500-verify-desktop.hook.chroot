@@ -1,0 +1,67 @@
+#!/bin/sh
+set -eu
+
+# Check desktop IDs against the Debian packages installed in this image.
+while read -r package desktop; do
+    path="/usr/share/applications/$desktop"
+    if ! dpkg-query -L "$package" | grep -Fxq "$path" || [ ! -s "$path" ]; then
+        printf 'Expected desktop entry %s from %s\n' "$desktop" "$package" >&2
+        exit 1
+    fi
+    desktop-file-validate "$path" || {
+        # Some vendor entries use deprecated fields. Validate new launchers below.
+        case "$package" in gnome-software|vlc) exit 1 ;; esac
+    }
+    printf 'Verified %s: %s\n' "$package" "$desktop"
+done <<'ENTRIES'
+blackbox-terminal com.raggesilver.BlackBox.desktop
+file-roller org.gnome.FileRoller.desktop
+gnome-software org.gnome.Software.desktop
+gnome-system-monitor org.gnome.SystemMonitor.desktop
+gnome-text-editor org.gnome.TextEditor.desktop
+loupe org.gnome.Loupe.desktop
+vlc vlc.desktop
+nautilus org.gnome.Nautilus.desktop
+firefox-esr firefox-esr.desktop
+gnome-disk-utility org.gnome.DiskUtility.desktop
+kde-spectacle org.kde.spectacle.desktop
+ENTRIES
+
+test -s /usr/share/wayland-sessions/plasma.desktop
+test -x /usr/bin/blackbox-terminal
+
+for package in floorp fragments transmission-daemon mpv papers gnome-calculator plasma-discover plasma-discover-backend-flatpak libdvd-pkg libdvdcss-dev; do
+    if [ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null)" = installed ]; then
+        printf 'Unexpected package in image: %s\n' "$package" >&2
+        exit 1
+    fi
+done
+test ! -e /usr/share/applications/org.kde.discover.desktop
+
+for package in libdvdcss2 libdvdread8t64 libdvdnav4 libbluray2 libaacs0 libbdplus0 \
+    libbluray-bdj openjdk-21-jre-headless vlc-plugin-base vlc-plugin-qt vlc-plugin-video-output; do
+    test "$(dpkg-query -W -f='${db:Status-Status}' "$package")" = installed
+done
+for plugin in access/libdvdnav_plugin.so access/libdvdread_plugin.so \
+    access/liblibbluray_plugin.so codec/libavcodec_plugin.so; do
+    test -s "/usr/lib/x86_64-linux-gnu/vlc/plugins/$plugin"
+done
+test -s /usr/share/solid/actions/vlc-opendvd.desktop
+test -s /usr/share/solid/actions/vlc-openbd.desktop
+java -version
+
+# Compare the configured associations with the installed launchers on disk.
+desktop_id=$(sed -n 's/^x-scheme-handler\/https=\(.*\);$/\1/p' /etc/xdg/mimeapps.list)
+test -s "/usr/share/applications/$desktop_id"
+for type in text/html application/xhtml+xml x-scheme-handler/http x-scheme-handler/https; do
+    grep -Fx "$type=$desktop_id;" /etc/xdg/mimeapps.list
+done
+grep -Fx 'video/mp4=vlc.desktop;' /etc/xdg/mimeapps.list
+grep -Fx 'x-content/video-dvd=vlc.desktop;' /etc/xdg/mimeapps.list
+grep -Fx 'x-content/video-bluray=vlc.desktop;' /etc/xdg/mimeapps.list
+launchers=/usr/share/plasma/shells/org.kde.plasma.desktop/contents/updates/aphrodite-os-launchers.js
+grep -F 'widget.writeConfig("launchers", urls);' "$launchers"
+if grep -Ei 'floorp|discover|fragments|mpv' "$launchers" /etc/xdg/mimeapps.list; then
+    exit 1
+fi
+apt-get check

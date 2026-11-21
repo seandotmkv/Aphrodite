@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+kdialog --title 'Switch to Gaming Mode' --yesno \
+    'Save your work before signing out. Select aphrodite-os Gaming Mode at the SDDM login screen. You can cancel the Plasma sign-out prompt.' || exit 0
+exec /usr/lib/qt6/bin/qdbus org.kde.LogoutPrompt /LogoutPrompt org.kde.LogoutPrompt.promptLogout

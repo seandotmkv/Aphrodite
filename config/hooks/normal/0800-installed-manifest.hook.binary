@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+# live-build captures its normal target package list before later hooks add
+# libdvdcss2 and the installer package. Start with the final list.
+live=../chroot.packages.live
+target=../chroot.packages.install
+live_only=../chroot/usr/share/aphrodite-os/live-only-packages
+test -s "$live_only"
+awk 'NR == FNR { omit[$1] = 1; next }
+     { name = $1; sub(/:[^:]+$/, "", name); if (!omit[name]) print }' \
+    "$live_only" "$live" > "$target"
+awk 'NR == FNR { keep[$1] = 1; next } !($1 in keep) { print $1 }' \
+    "$target" "$live" > live/filesystem.packages-remove
+test -s live/filesystem.packages-remove

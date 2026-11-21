@@ -1,0 +1,4 @@
+Original wallpaper supplied by the user as wallpaper.jpg (2048x1365).
+Identified source: jplenio, forest-3622519, Pixabay.
+https://pixabay.com/images/download/jplenio-forest-3622519_1920.jpg
+The uploaded bytes are retained unchanged. Plasma fills the display while preserving aspect ratio.

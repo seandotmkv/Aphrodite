@@ -1,0 +1,12 @@
+calamares
+calamares-settings-debian
+qml6-module-qtquick-controls
+qml6-module-qtquick-layouts
+qml6-module-qtquick-templates
+qml6-module-qtqml-workerscript
+x11-xserver-utils
+squashfs-tools
+python3-yaml
+xdg-user-dirs
+kdialog
+fdisk

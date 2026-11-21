@@ -1,0 +1,51 @@
+QWidget {
+    background-color: #262626;
+    color: #F5F5F5;
+    selection-background-color: #F3A1C3;
+    selection-color: #211219;
+}
+#sidebarApp {
+    background-color: #252525;
+    border-right: 1px solid #454545;
+    min-width: 240px;
+}
+QToolTip { background: #393039; color: #F5F5F5; border: 1px solid #F3A1C3; }
+QLineEdit, QComboBox, QSpinBox, QDateEdit, QTimeEdit {
+    background: #313131;
+    border: 1px solid #585858;
+    border-radius: 8px;
+    padding: 5px 9px;
+}
+QPushButton {
+    border: 1px solid #F3A1C3;
+    border-radius: 10px;
+    color: #F3A1C3;
+    padding: 7px 15px;
+}
+QPushButton:default { background: #F3A1C3; color: #211219; }
+QPushButton:hover { border-color: #FFD6E7; }
+QPushButton:focus, QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+    border: 2px solid #FFD6E7;
+}
+QPushButton:disabled, QLineEdit:disabled, QComboBox:disabled {
+    background: #303030;
+    color: #A8A8A8;
+    border-color: #4C4C4C;
+}
+QProgressBar { border: 1px solid #585858; border-radius: 7px; text-align: center; }
+QProgressBar::chunk { background: #893A60; border-radius: 6px; }
+#exec-progress { color: #F5F5F5; }
+QCheckBox::indicator:checked, QCheckBox::indicator:indeterminate {
+    width: 15px;
+    height: 15px;
+    border: 2px solid #F3A1C3;
+    border-radius: 4px;
+    background: #893A60;
+}
+QRadioButton::indicator:checked {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #F3A1C3;
+    border-radius: 9px;
+    background: #893A60;
+}

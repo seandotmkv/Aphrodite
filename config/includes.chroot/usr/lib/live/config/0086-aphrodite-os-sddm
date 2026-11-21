@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+# Run after live-config creates the live account. Explicitly configure the
+# Wayland session even if Debian's SDDM component left Session empty.
+test -d /run/live/medium || exit 0
+/usr/bin/python3 /usr/lib/aphrodite/login.py --live

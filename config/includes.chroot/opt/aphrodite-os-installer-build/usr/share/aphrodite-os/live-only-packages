@@ -1,0 +1,10 @@
+aphrodite-os-live-installer
+calamares-settings-debian
+calamares
+live-boot
+live-boot-initramfs-tools
+live-config
+live-config-systemd
+live-tools
+kdialog
+squashfs-tools

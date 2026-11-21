@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=aphrodite-os Gaming Mode
+Comment=Steam in a standalone Gamescope session
+Exec=/usr/local/bin/aphrodite-os-gaming
+TryExec=/usr/local/bin/aphrodite-os-gaming
+DesktopNames=gamescope

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Install Aphrodite OS
+Comment=Install Aphrodite OS on this computer
+Exec=install-aphrodite-os
+Icon=/usr/share/pixmaps/aphrodite.png
+Terminal=true
+Categories=System;
+StartupNotify=false

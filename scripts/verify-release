@@ -1,0 +1,84 @@
+#!/bin/sh
+set -eu
+cd -- "$(dirname -- "$0")/.."
+
+test -s aphrodite-os-0-amd64.iso
+test -s aphrodite-os-0-amd64.packages
+test -s chroot.packages.install
+test -s binary/live/filesystem.packages-remove
+cmp -- chroot.packages.live aphrodite-os-0-amd64.packages
+for package in aphrodite-os-live-installer calamares calamares-settings-debian; do
+    grep -Eq "^$package[[:space:]]" aphrodite-os-0-amd64.packages
+    grep -Fx "$package" binary/live/filesystem.packages-remove
+    if grep -Eq "^$package[[:space:]]" chroot.packages.install; then
+        exit 1
+    fi
+done
+if grep -Eq '^firefox-esr(:amd64)?[[:space:]]' chroot.packages.install; then
+    echo 'Firefox must remain live-only until explicitly selected for a target.' >&2
+    exit 1
+fi
+for package in aphrodite-base plasma-desktop sddm pipewire-audio wireplumber network-manager \
+    blackbox-terminal nautilus loupe gnome-text-editor gnome-disk-utility kde-spectacle \
+    gnome-system-monitor file-roller vlc gnome-software gnome-software-plugin-deb \
+    packagekit appstream libdvdcss2 libbluray-bdj openjdk-21-jre-headless \
+    sudo grub-pc-bin grub-efi-amd64-bin fonts-noto-cjk fcitx5-chewing; do
+    if ! grep -Eq "^${package}(:amd64)?[[:space:]]" chroot.packages.install; then
+        printf 'Base target manifest is missing %s. Rebuild the image before release.\n' "$package" >&2
+        exit 1
+    fi
+done
+if grep -E '^(floorp|fragments|transmission-daemon|mpv|papers|gnome-calculator|plasma-discover[^[:space:]]*|libdvd-pkg|libdvdcss-dev|vim-tiny|vim-common|steam-installer|gamescope)(:amd64)?[[:space:]]' aphrodite-os-0-amd64.packages; then
+    exit 1
+fi
+# Check every catalog identity against both base manifests. Extra library
+# dependencies are allowed, but catalog applications require an explicit choice.
+python3 - aphrodite-os-0-amd64.packages chroot.packages.install <<'PYVERIFY'
+import json
+from pathlib import Path
+import sys
+
+catalog = Path("config/includes.chroot/opt/aphrodite-os-installer-build/usr/lib/calamares/modules/aphroditeprofiles/catalog.json")
+data = json.loads(catalog.read_text())
+optional = {app["methods"]["apt"]["packages"][0].split(":")[0]
+            for app in data["apps"] if "apt" in app["methods"] and app["id"] != "firefox"}
+for filename in sys.argv[1:]:
+    installed = {line.split()[0].split(":")[0] for line in Path(filename).read_text().splitlines() if line.strip()}
+    unexpected = installed & optional
+    if unexpected:
+        sys.exit(f"{filename} contains unselected applications: {', '.join(sorted(unexpected))}")
+PYVERIFY
+# List the actual ISO files using xorriso, including both installer paths.
+files=$(mktemp)
+trap 'rm -f "$files"' EXIT
+xorriso -indev aphrodite-os-0-amd64.iso -find / -type f -exec lsdl -- > "$files"
+grep -F "'/live/filesystem.squashfs'" "$files"
+grep -F "'/live/filesystem.packages-remove'" "$files"
+grep -F "'/install/gtk/initrd.gz'" "$files"
+if command -v unsquashfs >/dev/null; then
+    for path in usr/share/applications/install-aphrodite-os.desktop \
+        usr/share/pixmaps/aphrodite.png \
+        usr/share/pixmaps/mnemosyne.png \
+        usr/libexec/aphrodite-os-installer-root \
+        usr/libexec/aphrodite_os_install.py \
+        usr/libexec/aphrodite_os_progress.py \
+        usr/lib/calamares/modules/aphroditeprofiles/processio.py \
+        usr/bin/aphrodite-os-installer-tui \
+        usr/bin/aphrodite-os-apply-packages \
+        usr/lib/calamares/modules/aphroditeprofiles/catalog.json \
+        etc/calamares/branding/aphrodite-os/PackageCatalog.js \
+        usr/libexec/aphrodite-os-protect-medium \
+        usr/libexec/aphrodite-os-ventoy-device \
+        etc/calamares/settings.conf \
+        etc/calamares/branding/aphrodite-os/Translations.js \
+        etc/calamares/branding/aphrodite-os/packagechooserq@aphroditepackages.qml; do
+        unsquashfs -cat binary/live/filesystem.squashfs "$path" >/dev/null
+    done
+    for path in usr/bin/aphrodite-apps usr/bin/aphrodite-system usr/bin/aphrodite-update \
+        usr/lib/aphrodite/releases.py usr/lib/aphrodite/login.py usr/lib/aphrodite/transactional.py \
+        usr/lib/systemd/user/aphrodite-update.service usr/lib/systemd/user/aphrodite-update.timer \
+        usr/lib/aphrodite/packages/executor.py usr/lib/aphrodite/packages/catalog.json; do
+        unsquashfs -cat binary/live/filesystem.squashfs "$path" >/dev/null
+    done
+fi
+cp -- chroot.packages.install aphrodite-os-0-amd64.target.packages

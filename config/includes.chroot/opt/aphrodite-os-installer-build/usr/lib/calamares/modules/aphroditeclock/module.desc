@@ -1,0 +1,6 @@
+---
+type: job
+name: aphroditeclock
+interface: python
+script: main.py
+noconfig: true

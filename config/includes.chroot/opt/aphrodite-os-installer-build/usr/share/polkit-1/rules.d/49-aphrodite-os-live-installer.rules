@@ -1,0 +1,6 @@
+polkit.addRule(function(action, subject) {
+    if (action.id === "org.aphrodite-os.install" &&
+        subject.active && subject.local && subject.user === "live") {
+        return polkit.Result.YES;
+    }
+});

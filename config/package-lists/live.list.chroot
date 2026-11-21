@@ -1,0 +1,11 @@
+ca-certificates
+iproute2
+keyboard-configuration
+live-boot
+live-config
+live-config-systemd
+live-tools
+locales
+sudo
+systemd-sysv
+user-setup

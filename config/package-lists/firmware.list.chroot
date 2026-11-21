@@ -1,0 +1,12 @@
+# Guarantee common amd64 firmware even if Contents-based discovery is incomplete.
+amd64-microcode
+firmware-amd-graphics
+firmware-atheros
+firmware-brcm80211
+firmware-intel-graphics
+firmware-iwlwifi
+firmware-linux
+firmware-mediatek
+firmware-realtek
+firmware-sof-signed
+intel-microcode

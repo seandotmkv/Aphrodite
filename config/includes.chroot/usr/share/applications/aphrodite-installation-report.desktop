@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Aphrodite OS Installation Report
+Comment=Review selected applications, failures and first-run requirements
+Exec=aphrodite-apps status
+Icon=/usr/share/pixmaps/aphrodite.png
+Terminal=true
+Categories=System;

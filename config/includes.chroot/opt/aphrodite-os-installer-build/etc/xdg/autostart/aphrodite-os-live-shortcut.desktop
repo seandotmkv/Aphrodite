@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Create the aphrodite-os live desktop shortcut
+Exec=/usr/libexec/aphrodite-os-live-shortcut
+NoDisplay=true
+StartupNotify=false

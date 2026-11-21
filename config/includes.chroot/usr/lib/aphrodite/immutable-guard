@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+if [ -f /etc/aphrodite/transactional.json ] && [ ! -f /run/aphrodite-staging ]; then
+    echo 'The Aphrodite OS base is protected. Use sudo aphrodite-system update or sudo aphrodite-system layer PACKAGE. Use Flatpak for desktop apps.' >&2
+    exit 1
+fi

@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Export the built Aphrodite package and GitHub release update manifest."""
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+
+root = Path(__file__).resolve().parents[1]
+version = (root / 'config/includes.chroot/usr/share/aphrodite/package-version').read_text().strip()
+subprocess.run(['dpkg', '--validate-version', version], check=True)
+asset = 'aphrodite-base_' + version + '_all.deb'
+source = root / 'chroot/var/cache/aphrodite/build' / asset
+if not source.is_file():
+    raise SystemExit('Build the ISO first: the completed chroot update package is missing.')
+output = root / 'release-assets' / version
+output.mkdir(parents=True, exist_ok=True)
+destination = output / asset
+shutil.copyfile(source, destination)
+sha = hashlib.sha256(destination.read_bytes()).hexdigest()
+manifest = {'schema': 1, 'os': 'aphrodite', 'series': '0', 'architecture': 'amd64',
+            'packages': [{'name': 'aphrodite-base', 'version': version,
+                          'asset': asset, 'sha256': sha}]}
+(output / 'aphrodite-update.json').write_text(json.dumps(manifest, indent=2) + '\n')
+(output / 'SHA256SUMS').write_text(sha + '  ' + asset + '\n')
+print('Upload these files together to a published stable GitHub release at seandotmkv/Aphrodite:')
+for filename in (asset, 'aphrodite-update.json', 'SHA256SUMS'):
+    print(output / filename)
+print('Use a new Debian package version for every changed package. No GitHub upload was performed.')

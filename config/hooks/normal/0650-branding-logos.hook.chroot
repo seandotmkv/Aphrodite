@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+
+# These are base-image assets, so they survive removal of the live installer.
+# Validate the original user files without downloading or converting images.
+python3 - <<'PY'
+import hashlib
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+assets = Path('/usr/share/pixmaps')
+expected = {
+    'aphrodite.png': 'e27e6330203b74b6eee965ec747f76baa244321d7f3d7114f273b1c877e6b864',
+    'mnemosyne.png': 'cbb7d59635e537a073184526d38d6938733fe45c10069b9b24a1ca15d0761c23',
+}
+for name, digest in expected.items():
+    data = (assets / name).read_bytes()
+    if not data.startswith(b'\x89PNG\r\n\x1a\n') or hashlib.sha256(data).hexdigest() != digest:
+        raise SystemExit(f'Branding asset is missing or changed: {name}')
+
+# Run after release identity generation; change only LOGO, preserving all
+# release names, IDs, versions and existing upgrade/diversion behaviour.
+release = Path('/usr/lib/os-release')
+lines = [line for line in release.read_text().splitlines() if not line.startswith('LOGO=')]
+release.write_text('\n'.join(lines + ['LOGO=aphrodite']) + '\n')
+
+# Fresh Plasma profiles use the correct logo even before update scripts run.
+schema = Path('/usr/share/plasma/plasmoids/org.kde.plasma.kickoff/contents/config/main.xml')
+ns = {'k': 'http://www.kde.org/standards/kcfg/1.0'}
+ET.register_namespace('', ns['k'])
+ET.register_namespace('xsi', 'http://www.w3.org/2001/XMLSchema-instance')
+tree = ET.parse(schema)
+icon = tree.find("k:group[@name='General']/k:entry[@name='icon']/k:default", ns)
+if icon is None:
+    raise SystemExit('Review the Plasma Kickoff icon schema before rebuilding')
+icon.text = '/usr/share/pixmaps/aphrodite.png'
+tree.write(schema, encoding='UTF-8', xml_declaration=True)
+PY

@@ -1,0 +1,28 @@
+---
+componentName: aphrodite-os
+welcomeStyleCalamares: false
+welcomeExpandingLogo: false
+windowExpanding: normal
+windowSize: 1000px,620px
+windowPlacement: center
+sidebar: qml
+navigation: qml
+strings:
+  productName: Aphrodite OS
+  shortProductName: Aphrodite OS
+  version: "0"
+  shortVersion: "0"
+  versionedName: Aphrodite OS 0 (infant)
+  shortVersionedName: Aphrodite OS 0
+  bootloaderEntryName: Aphrodite OS
+images:
+  productIcon: /usr/share/pixmaps/aphrodite.png
+  productLogo: /usr/share/pixmaps/aphrodite.png
+  productWelcome: /usr/share/pixmaps/aphrodite.png
+style:
+  SidebarBackground: "#252525"
+  SidebarText: "#A8A8A8"
+  SidebarTextCurrent: "#26121C"
+  SidebarBackgroundCurrent: "#F3A1C3"
+slideshow: installing.qml
+slideshowAPI: 2

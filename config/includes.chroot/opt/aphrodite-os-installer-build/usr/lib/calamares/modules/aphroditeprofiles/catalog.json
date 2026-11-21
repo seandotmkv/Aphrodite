@@ -1,0 +1,1720 @@
+{
+  "version": 1,
+  "categories": {
+    "browser": {
+      "title": "Browsers",
+      "icon": "web-browser"
+    },
+    "utility": {
+      "title": "Recommended Utilities",
+      "icon": "applications-utilities"
+    },
+    "gaming": {
+      "title": "Gaming",
+      "icon": "input-gaming"
+    },
+    "creation": {
+      "title": "Content Creation",
+      "icon": "applications-multimedia"
+    },
+    "internet": {
+      "title": "Internet and Downloads",
+      "icon": "applications-internet"
+    },
+    "office": {
+      "title": "Office and Productivity",
+      "icon": "applications-office"
+    },
+    "development": {
+      "title": "Development",
+      "icon": "applications-development"
+    },
+    "sean": {
+      "title": "Sean's Additional Packages",
+      "icon": "folder-download"
+    }
+  },
+  "apps": [
+    {
+      "id": "firefox",
+      "name": "Firefox ESR",
+      "description": "Debian's extended-support web browser.",
+      "category": "browser",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "firefox-esr"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "firefox-esr.desktop",
+      "source": "",
+      "extra": [],
+      "icon": "web-browser"
+    },
+    {
+      "id": "zen",
+      "name": "Zen Browser",
+      "description": "Firefox-based browser with workspaces.",
+      "category": "browser",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "app.zen_browser.zen"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "app.zen_browser.zen"
+    },
+    {
+      "id": "brave",
+      "name": "Brave",
+      "description": "Chromium-based browser with tracker blocking.",
+      "category": "browser",
+      "methods": {
+        "apt": {
+          "source": "Brave official signed APT repository",
+          "suite": "brave",
+          "packages": [
+            "brave-browser"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.brave.Browser"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "brave-browser.desktop",
+      "source": "",
+      "extra": [],
+      "icon": "com.brave.Browser"
+    },
+    {
+      "id": "chromium",
+      "name": "Chromium",
+      "description": "Open-source Chromium web browser.",
+      "category": "browser",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "chromium"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "chromium.desktop",
+      "source": "",
+      "extra": [],
+      "icon": "web-browser"
+    },
+    {
+      "id": "vivaldi",
+      "name": "Vivaldi",
+      "description": "Customizable Chromium-based browser.",
+      "category": "browser",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.vivaldi.Vivaldi"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "proprietary",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.vivaldi.Vivaldi"
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "description": "Local Markdown notes and linked knowledge base.",
+      "category": "utility",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "md.obsidian.Obsidian"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "proprietary",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "md.obsidian.Obsidian"
+    },
+    {
+      "id": "easyeffects",
+      "name": "EasyEffects",
+      "description": "PipeWire equalizer and effects.",
+      "category": "utility",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "easyeffects"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-utilities"
+    },
+    {
+      "id": "flatseal",
+      "name": "Flatseal",
+      "description": "Manage Flatpak application permissions.",
+      "category": "utility",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.github.tchx84.Flatseal"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.github.tchx84.Flatseal"
+    },
+    {
+      "id": "gear-lever",
+      "name": "Gear Lever",
+      "description": "Organize AppImages and their launchers.",
+      "category": "utility",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "it.mijorus.gearlever"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "it.mijorus.gearlever"
+    },
+    {
+      "id": "extension-manager",
+      "name": "Extension Manager",
+      "description": "Browse and manage GNOME Shell extensions.",
+      "category": "utility",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "gnome-shell-extension-manager"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "gnome",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-utilities"
+    },
+    {
+      "id": "kde-connect",
+      "name": "KDE Connect",
+      "description": "Share files and notifications with your phone.",
+      "category": "utility",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "kdeconnect"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-utilities"
+    },
+    {
+      "id": "localsend",
+      "name": "LocalSend",
+      "description": "Send files over your local network.",
+      "category": "utility",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.localsend.localsend_app"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.localsend.localsend_app"
+    },
+    {
+      "id": "timeshift",
+      "name": "Timeshift",
+      "description": "System snapshots.",
+      "category": "utility",
+      "methods": {},
+      "reason": "No validated snapshot and restore layout is available.",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-utilities"
+    },
+    {
+      "id": "syncthing",
+      "name": "Syncthing",
+      "description": "Synchronize folders across devices.",
+      "category": "utility",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "syncthing"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-utilities"
+    },
+    {
+      "id": "keepassxc",
+      "name": "KeePassXC",
+      "description": "Offline password manager.",
+      "category": "utility",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "keepassxc"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": true,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-utilities"
+    },
+    {
+      "id": "steam",
+      "name": "Steam",
+      "description": "Steam launcher and graphics runtime; first launch initializes the official client. No bootstrap placeholder is pinned.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "steam-installer",
+            "steam-devices",
+            "libgl1-mesa-dri:i386",
+            "libglx-mesa0:i386",
+            "mesa-vulkan-drivers:i386",
+            "libvulkan1:i386",
+            "libvulkan1"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "proprietary",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "heroic",
+      "name": "Heroic Games Launcher",
+      "description": "Launch Epic and GOG games.",
+      "category": "gaming",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.heroicgameslauncher.hgl"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.heroicgameslauncher.hgl"
+    },
+    {
+      "id": "gog-galaxy",
+      "name": "GOG Galaxy",
+      "description": "Windows client requiring a compatibility layer.",
+      "category": "gaming",
+      "methods": {},
+      "reason": "No reliable compatibility-layer installation has been verified.",
+      "large": false,
+      "license": "proprietary",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "lutris",
+      "name": "Lutris",
+      "description": "Manage games and compatibility runners.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "lutris"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "bottles",
+      "name": "Bottles",
+      "description": "Manage isolated Wine environments.",
+      "category": "gaming",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.usebottles.bottles"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.usebottles.bottles"
+    },
+    {
+      "id": "mangohud",
+      "name": "MangoHud",
+      "description": "Display game performance metrics.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "mangohud"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "goverlay",
+      "name": "GOverlay",
+      "description": "Configure MangoHud and related overlays.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "goverlay"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "protonup-qt",
+      "name": "ProtonUp-Qt",
+      "description": "Manage Proton and Wine compatibility builds.",
+      "category": "gaming",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "net.davidotek.pupgui2"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "net.davidotek.pupgui2"
+    },
+    {
+      "id": "gamemode",
+      "name": "GameMode",
+      "description": "Request temporary system performance tuning for games.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "gamemode"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "gamescope",
+      "name": "Gamescope",
+      "description": "Gaming compositor. The dedicated session separately requires Steam.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie-backports",
+          "suite": "trixie-backports",
+          "packages": [
+            "gamescope"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "prism-launcher",
+      "name": "Prism Launcher",
+      "description": "Manage Minecraft instances.",
+      "category": "gaming",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.prismlauncher.PrismLauncher"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.prismlauncher.PrismLauncher"
+    },
+    {
+      "id": "retroarch",
+      "name": "RetroArch",
+      "description": "Frontend for emulator cores.",
+      "category": "gaming",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "retroarch"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "input-gaming"
+    },
+    {
+      "id": "obs-studio",
+      "name": "OBS Studio",
+      "description": "Record and stream audio and video.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "obs-studio"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.obsproject.Studio"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.obsproject.Studio"
+    },
+    {
+      "id": "resolve",
+      "name": "DaVinci Resolve",
+      "description": "Professional editing with proprietary licensing and GPU requirements.",
+      "category": "creation",
+      "methods": {},
+      "reason": "Requires a separate Blackmagic installer and compatible GPU. Legacy dependency support is not the application.",
+      "large": true,
+      "license": "proprietary",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-multimedia"
+    },
+    {
+      "id": "kdenlive",
+      "name": "Kdenlive",
+      "description": "Multitrack video editor.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "kdenlive"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.kde.kdenlive"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.kde.kdenlive"
+    },
+    {
+      "id": "shotcut",
+      "name": "Shotcut",
+      "description": "Timeline video editor.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "shotcut"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-multimedia"
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "description": "3D modelling, animation and rendering.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "blender"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.blender.Blender"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.blender.Blender"
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "description": "Raster image editor.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "gimp"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.gimp.GIMP"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.gimp.GIMP"
+    },
+    {
+      "id": "krita",
+      "name": "Krita",
+      "description": "Digital painting and illustration.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "krita"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.kde.krita"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.kde.krita"
+    },
+    {
+      "id": "inkscape",
+      "name": "Inkscape",
+      "description": "Vector graphics editor.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "inkscape"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.inkscape.Inkscape"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.inkscape.Inkscape"
+    },
+    {
+      "id": "audacity",
+      "name": "Audacity",
+      "description": "Record and edit audio.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "audacity"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-multimedia"
+    },
+    {
+      "id": "tenacity",
+      "name": "Tenacity",
+      "description": "Multitrack audio editor.",
+      "category": "creation",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.tenacityaudio.Tenacity"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.tenacityaudio.Tenacity"
+    },
+    {
+      "id": "handbrake",
+      "name": "HandBrake",
+      "description": "Transcode video files.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "handbrake"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-multimedia"
+    },
+    {
+      "id": "mpv",
+      "name": "mpv",
+      "description": "Alternative lightweight media player.",
+      "category": "creation",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "mpv"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-multimedia"
+    },
+    {
+      "id": "qbittorrent",
+      "name": "qBittorrent",
+      "description": "Graphical BitTorrent client.",
+      "category": "internet",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "qbittorrent"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-internet"
+    },
+    {
+      "id": "transmission",
+      "name": "Transmission",
+      "description": "Desktop BitTorrent client without a system daemon.",
+      "category": "internet",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "transmission-gtk"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-internet"
+    },
+    {
+      "id": "jdownloader",
+      "name": "JDownloader 2",
+      "description": "Download manager for file hosting services.",
+      "category": "internet",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.jdownloader.JDownloader"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "mixed",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.jdownloader.JDownloader"
+    },
+    {
+      "id": "filezilla",
+      "name": "FileZilla",
+      "description": "Graphical FTP and SFTP client.",
+      "category": "internet",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "filezilla"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-internet"
+    },
+    {
+      "id": "yt-dlp",
+      "name": "yt-dlp",
+      "description": "Command-line media downloader.",
+      "category": "internet",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "yt-dlp"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-internet"
+    },
+    {
+      "id": "nicotine",
+      "name": "Nicotine+",
+      "description": "Graphical Soulseek client.",
+      "category": "internet",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "nicotine"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-internet"
+    },
+    {
+      "id": "aria2",
+      "name": "aria2",
+      "description": "Command-line downloader.",
+      "category": "internet",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "aria2"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-internet"
+    },
+    {
+      "id": "libreoffice",
+      "name": "LibreOffice",
+      "description": "Writer, Calc, Impress and other office tools.",
+      "category": "office",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "libreoffice"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-office"
+    },
+    {
+      "id": "onlyoffice",
+      "name": "ONLYOFFICE",
+      "description": "Document, spreadsheet and presentation editor.",
+      "category": "office",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.onlyoffice.desktopeditors"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.onlyoffice.desktopeditors"
+    },
+    {
+      "id": "joplin",
+      "name": "Joplin",
+      "description": "Notebook and task manager.",
+      "category": "office",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "net.cozic.joplin_desktop"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "net.cozic.joplin_desktop"
+    },
+    {
+      "id": "thunderbird",
+      "name": "Thunderbird",
+      "description": "Email and calendar client.",
+      "category": "office",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "thunderbird"
+          ]
+        },
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "org.mozilla.thunderbird"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "org.mozilla.thunderbird"
+    },
+    {
+      "id": "calibre",
+      "name": "Calibre",
+      "description": "Manage and convert ebooks.",
+      "category": "office",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "calibre"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-office"
+    },
+    {
+      "id": "pdfarranger",
+      "name": "PDF Arranger",
+      "description": "Reorder, crop and combine PDF pages.",
+      "category": "office",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "pdfarranger"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": true,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-office"
+    },
+    {
+      "id": "papers",
+      "name": "Papers",
+      "description": "Read PDF documents and comics.",
+      "category": "office",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "papers"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-office"
+    },
+    {
+      "id": "calculator",
+      "name": "Calculator",
+      "description": "Perform basic and scientific calculations.",
+      "category": "office",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "gnome-calculator"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-office"
+    },
+    {
+      "id": "vscode",
+      "name": "Visual Studio Code",
+      "description": "Microsoft's editor and extension ecosystem.",
+      "category": "development",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.visualstudio.code"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "proprietary",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.visualstudio.code"
+    },
+    {
+      "id": "vscodium",
+      "name": "VSCodium",
+      "description": "Community builds of the open-source VS Code editor.",
+      "category": "development",
+      "methods": {
+        "flatpak": {
+          "source": "Flathub",
+          "ref": "com.vscodium.codium"
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "com.vscodium.codium"
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "description": "Distributed source control.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "git"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "python-dev",
+      "name": "Python development tools",
+      "description": "Python headers, pip and virtual environments.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "python3-dev",
+            "python3-pip",
+            "python3-venv"
+          ]
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "open-source",
+      "recommended": false,
+      "full": true,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "rust",
+      "name": "Rust toolchain",
+      "description": "Debian Rust compiler and Cargo.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "rustc",
+            "cargo"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "nodejs",
+      "name": "Node.js",
+      "description": "JavaScript runtime and npm.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "nodejs",
+            "npm"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "docker",
+      "name": "Docker",
+      "description": "System container daemon and CLI.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "docker.io"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "podman",
+      "name": "Podman",
+      "description": "Daemonless containers with rootless support.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "podman",
+            "uidmap",
+            "passt"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "distrobox",
+      "name": "Distrobox",
+      "description": "Run distribution environments in containers.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "distrobox",
+            "podman",
+            "uidmap",
+            "passt"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "gnome-boxes",
+      "name": "GNOME Boxes",
+      "description": "Simple virtual machine manager.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "gnome-boxes"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "virt-manager",
+      "name": "Virt-Manager",
+      "description": "Manage libvirt virtual machines.",
+      "category": "development",
+      "methods": {
+        "apt": {
+          "source": "Debian trixie",
+          "suite": "trixie",
+          "packages": [
+            "virt-manager",
+            "libvirt-daemon-system",
+            "qemu-system-x86"
+          ]
+        }
+      },
+      "reason": "",
+      "large": true,
+      "license": "open-source",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "",
+      "extra": [],
+      "icon": "applications-development"
+    },
+    {
+      "id": "torrentula",
+      "name": "Torrentula",
+      "description": "Lawful torrents such as Linux ISOs and freely distributable apps.",
+      "category": "sean",
+      "methods": {
+        "source": {
+          "source": "Pinned GitHub source",
+          "commit": "6dfb824e7f1a1d196acbe20bc47868220de06f99",
+          "sha256": "3b7ac773539389403ac1be767321a22fc99472e6c284fdaf4445cb901f5ee8bb",
+          "url": "https://codeload.github.com/seandotmkv/torrentula/tar.gz/6dfb824e7f1a1d196acbe20bc47868220de06f99",
+          "archive": "torrentula 1.0.zip",
+          "packages": [
+            "python3",
+            "python3-requests",
+            "python3-pyperclip"
+          ],
+          "members": [
+            "files/app/torrentula.py",
+            "files/app/torrentula_gui.py",
+            "files/app/torrentula_gui.html",
+            "files/app/torrentula.png"
+          ],
+          "entry": "torrentula_gui.py"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "No license declared upstream",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "https://github.com/seandotmkv/torrentula",
+      "extra": [
+        "A separate torrent client handles magnet links."
+      ],
+      "icon": "folder-download"
+    },
+    {
+      "id": "mnemosyne",
+      "name": "Mnemosyne",
+      "description": "Personal video downloads consistent with applicable rights and platform terms.",
+      "category": "sean",
+      "methods": {
+        "source": {
+          "source": "Pinned GitHub source",
+          "commit": "d9589d0c06525f9187a3d0ae29b889471fd1db5b",
+          "sha256": "c1ebfe3889e407a1a6e4e31cd75d8a1e77ab8f3eb522131de1c5fa739b2c6d8d",
+          "url": "https://codeload.github.com/seandotmkv/Mnemosyne/tar.gz/d9589d0c06525f9187a3d0ae29b889471fd1db5b",
+          "archive": "Mnemosyne-Multi-System.zip",
+          "packages": [
+            "python3",
+            "yt-dlp",
+            "ffmpeg"
+          ],
+          "members": [
+            "Mnemosyne/files/app/mnemosyne.py",
+            "Mnemosyne/files/app/mnemosyne.html"
+          ],
+          "entry": "mnemosyne.py"
+        }
+      },
+      "reason": "",
+      "large": false,
+      "license": "GPL-3.0",
+      "recommended": false,
+      "full": false,
+      "desktop": "any",
+      "launcher": "",
+      "source": "https://github.com/seandotmkv/Mnemosyne",
+      "extra": [
+        "Python >=3.9",
+        "yt-dlp",
+        "FFmpeg",
+        "Node >=22 or Deno >=2.3 for full YouTube support (supplied README)"
+      ],
+      "icon": "mnemosyne"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+#!/bin/sh
+set -eu
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+dpkg-query -W -f='${Package}\t${db:Status-Status}\n' |
+    awk '$2 == "installed" {print $1}' | sort -u > "$tmp/before"
+printf '%s\n' 'libdvd-pkg libdvd-pkg/build boolean true' \
+    'libdvd-pkg libdvd-pkg/post-invoke_hook-install boolean false' | debconf-set-selections
+apt-get -y --no-install-recommends --no-remove install libdvd-pkg
+dpkg-reconfigure libdvd-pkg
+if [ "$(dpkg-query -W -f='${db:Status-Status}' libdvdcss2 2>/dev/null || true)" != installed ]; then
+    /usr/lib/libdvd-pkg/b-i_libdvdcss.sh
+fi
+test "$(dpkg-query -W -f='${db:Status-Status}' libdvdcss2)" = installed
+
+install -d /usr/share/doc/aphrodite-os/libdvdcss-source
+cp /usr/src/libdvd-pkg/libdvdcss_*.orig.tar.bz2 /usr/share/doc/aphrodite-os/libdvdcss-source/
+cp -a /usr/share/libdvd-pkg/debian /usr/share/doc/aphrodite-os/libdvdcss-source/
+dpkg-query -W libdvd-pkg libdvdcss2 > /usr/share/doc/aphrodite-os/libdvdcss-build.txt
+(cd /usr/share/doc/aphrodite-os/libdvdcss-source && sha256sum ./*.orig.tar.bz2) \
+    >> /usr/share/doc/aphrodite-os/libdvdcss-build.txt
+
+# Debian's helper adds a dependency on itself to every generated .deb.
+# Drop just that packaging link from the runtime so APT can remove the toolchain.
+set -- /usr/src/libdvd-pkg/libdvdcss2_*_amd64.deb
+test "$#" -eq 1
+dpkg-deb --raw-extract "$1" "$tmp/runtime"
+grep -q '^Depends: libdvd-pkg, ' "$tmp/runtime/DEBIAN/control"
+sed -i -e 's/^Depends: libdvd-pkg, /Depends: /' \
+    -e '/^Version:/s/$/+seanos1/' "$tmp/runtime/DEBIAN/control"
+dpkg-deb --build --root-owner-group "$tmp/runtime" "$tmp/libdvdcss2.deb"
+dpkg -i "$tmp/libdvdcss2.deb"
+apt-mark manual libdvdcss2
+dpkg-query -W libdvdcss2 >> /usr/share/doc/aphrodite-os/libdvdcss-build.txt
+
+dpkg-query -W -f='${Package}\t${db:Status-Status}\n' |
+    awk '$2 == "installed" && $1 != "libdvdcss2" {print $1}' | sort -u > "$tmp/after"
+comm -13 "$tmp/before" "$tmp/after" > "$tmp/remove"
+if [ -s "$tmp/remove" ]; then
+    xargs -r apt-get -s purge < "$tmp/remove" > "$tmp/plan"
+    cat "$tmp/plan"
+    awk '/^(Remv|Purg) / {sub(/:.*/, "", $2); print $2}' "$tmp/plan" |
+        sort -u > "$tmp/planned"
+    comm -23 "$tmp/planned" "$tmp/remove" > "$tmp/unexpected"
+    test ! -s "$tmp/unexpected"
+    xargs -r apt-get -y purge < "$tmp/remove"
+fi
+test "$(dpkg-query -W -f='${db:Status-Status}' libdvdcss2)" = installed
+ldconfig -p | grep 'libdvdcss\.so\.2'
+apt-get check

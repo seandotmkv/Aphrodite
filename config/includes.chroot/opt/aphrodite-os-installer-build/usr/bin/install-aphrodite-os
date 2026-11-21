@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+case "$*" in
+    ""|--experimental-immutable) : ;;
+    *) echo 'Unsupported installer option' >&2; exit 2 ;;
+esac
+if ! test -t 0 || ! test -t 1; then
+    exec x-terminal-emulator -e /usr/bin/install-aphrodite-os "$@"
+fi
+if pkexec /usr/libexec/aphrodite-os-installer-root "$@"; then
+    exit 0
+else
+    status=$?
+    printf 'The installer exited with status %s. Press Enter to close.\n' "$status" >&2
+    read -r unused || :
+    exit "$status"
+fi

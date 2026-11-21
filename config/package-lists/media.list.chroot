@@ -1,0 +1,19 @@
+# VLC user interface, disc access, decoding and video output.
+vlc
+vlc-plugin-base
+vlc-plugin-qt
+vlc-plugin-video-output
+vlc-l10n
+libdvdread8t64
+libdvdnav4
+libbluray2
+libaacs0
+libbdplus0
+libbluray-bdj
+default-jre-headless
+libavcodec61
+libavformat61
+# GNOME/Nautilus image and video thumbnails and AMD VA-API diagnostics.
+ffmpegthumbnailer
+libgdk-pixbuf2.0-bin
+vainfo

@@ -1,0 +1,9 @@
+[Unit]
+Description=Check Aphrodite OS GitHub releases
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/aphrodite-update check --notify
+TimeoutStartSec=90
+Nice=10
+NoNewPrivileges=true

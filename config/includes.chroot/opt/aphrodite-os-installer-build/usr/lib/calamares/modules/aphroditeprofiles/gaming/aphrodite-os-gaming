@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+if [ "${XDG_SESSION_DESKTOP:-}" != gamescope ] && [ "${XDG_CURRENT_DESKTOP:-}" != gamescope ]; then
+    printf '%s\n' 'Select aphrodite-os Gaming Mode at the SDDM login screen.' >&2
+    exit 1
+fi
+if ! command -v gamescope >/dev/null || [ ! -x /usr/games/steam ]; then
+    printf '%s\n' 'Gamescope or Steam is missing. Sign in to Plasma to repair packages.' >&2
+    exit 1
+fi
+export PATH="/usr/local/lib/aphrodite-os/gaming:$PATH"
+exec gamescope --backend drm -e -- /usr/games/steam -gamepadui -steamos3

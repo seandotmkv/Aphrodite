@@ -1,0 +1,7 @@
+[General]
+ColorScheme=Ant-Dark
+TerminalApplication=blackbox-terminal
+TerminalService=com.raggesilver.BlackBox.desktop
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop

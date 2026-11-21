@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+lb build noauto "$@"
+
+. ./config/common
+. ./config/bootstrap
+. ./config/binary
+
+if [ "$LB_IMAGE_TYPE" = iso-hybrid ]; then
+    native_iso="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.hybrid.iso"
+    finished_iso="${LB_IMAGE_NAME}-${LB_ARCHITECTURE}.iso"
+
+    if [ ! -s "$native_iso" ]; then
+        printf 'Expected ISO missing: %s\n' "$native_iso" >&2
+        exit 1
+    fi
+    mv -f -- "$native_iso" "$finished_iso"
+fi

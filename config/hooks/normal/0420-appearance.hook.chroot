@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+wget -nv -O "$tmp/ant.tar.gz" https://api.github.com/repos/EliverLara/Ant/tarball/79ddc06
+tar -xzf "$tmp/ant.tar.gz" -C "$tmp"
+set -- "$tmp"/EliverLara-Ant-*
+test "$#" -eq 1
+install -Dm644 "$1/kde/Dark/color-schemes/Ant-Dark.colors" /usr/share/color-schemes/Ant-Dark.colors
+install -d /usr/share/plasma/desktoptheme
+cp -a "$1/kde/Dark/plasma/desktoptheme/Ant-Dark" /usr/share/plasma/desktoptheme/
+cat > /usr/share/plasma/desktoptheme/Ant-Dark/metadata.json <<'METADATA'
+{
+    "KPlugin": {
+        "Authors": [{"Name": "EliverLara"}],
+        "Id": "Ant-Dark",
+        "Name": "Ant-Dark",
+        "Description": "Ant dark Plasma style",
+        "License": "GPLv3",
+        "Version": "1.0.0",
+        "Website": "https://github.com/EliverLara/Ant"
+    }
+}
+METADATA
+install -Dm644 "$1/LICENSE" /usr/share/doc/aphrodite-os/Ant-LICENSE
+printf 'https://github.com/EliverLara/Ant\n%s\n' "${1##*/}" > /usr/share/doc/aphrodite-os/ant-build.txt
+# KColorScheme reads palette sections from kdeglobals at session startup.
+printf '\n' >> /etc/xdg/kdeglobals
+awk '/^\[/ {copy = $0 ~ /^\[Color/ || $0 == "[WM]"} copy' \
+    /usr/share/color-schemes/Ant-Dark.colors >> /etc/xdg/kdeglobals
+glib-compile-schemas --strict /usr/share/glib-2.0/schemas

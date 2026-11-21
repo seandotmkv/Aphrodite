@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+export LC_ALL=C
+
+# Debootstrap includes a second terminal editor. Keep nano for recovery.
+plan=$(apt-get -s purge vim-tiny vim-common)
+printf '%s\n' "$plan"
+unexpected=$(printf '%s\n' "$plan" | awk '/^(Remv|Purg) / && $2 !~ /^vim-(tiny|common)(:amd64)?$/')
+test -z "$unexpected"
+apt-get -y purge vim-tiny vim-common
+

@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+# These modules belong to the installed system, not the removable live installer.
+source=/opt/aphrodite-os-installer-build/usr/lib/calamares/modules/aphroditeprofiles
+test -r "$source/executor.py"
+install -d /usr/lib/aphrodite/packages
+cp -a "$source/." /usr/lib/aphrodite/packages/
+chmod 0755 /usr/bin/aphrodite-apps /usr/bin/aphrodite-system /usr/bin/aphrodite-update
+chmod 0755 /usr/lib/aphrodite/immutable-guard
+chmod 0755 /usr/share/initramfs-tools/scripts/local-bottom/aphrodite-state
+chmod 0755 /etc/grub.d/09_aphrodite_deployments
+# Own the installed runtime as a Debian package, independently of the live
+# installer. GitHub Releases distribute updates to this same package identity.
+package=$(mktemp -d)
+trap 'rm -rf "$package"' EXIT
+install -d "$package/root/DEBIAN"
+version=$(cat /usr/share/aphrodite/package-version)
+dpkg --validate-version "$version"
+cat > "$package/root/DEBIAN/control" <<CONTROL
+Package: aphrodite-base
+Version: $version
+Architecture: all
+Maintainer: Aphrodite OS build
+Depends: python3, ca-certificates, libnotify-bin, util-linux, btrfs-progs, initramfs-tools, grub2-common, flatpak, gnome-software-plugin-flatpak
+Section: admin
+Priority: optional
+Description: Aphrodite OS release updates, branding and system runtime
+CONTROL
+cat > "$package/root/DEBIAN/postinst" <<'POSTINST'
+#!/bin/sh
+set -eu
+if [ "$1" = configure ]; then
+    systemctl --global enable aphrodite-update.timer >/dev/null
+fi
+POSTINST
+chmod 0755 "$package/root/DEBIAN/postinst"
+for path in usr/bin/aphrodite-apps usr/bin/aphrodite-system usr/bin/aphrodite-update usr/lib/aphrodite \
+    usr/lib/systemd/user/aphrodite-update.service usr/lib/systemd/user/aphrodite-update.timer \
+    usr/share/aphrodite usr/share/pixmaps/aphrodite.png usr/share/pixmaps/mnemosyne.png \
+    usr/share/backgrounds/aphrodite-os \
+    etc/apt/apt.conf.d/00aphrodite-transactional etc/dpkg/dpkg.cfg.d/99-aphrodite-transactional \
+    etc/grub.d/09_aphrodite_deployments usr/share/initramfs-tools/scripts/local-bottom/aphrodite-state \
+    usr/share/applications/aphrodite-installation-report.desktop; do
+    install -d "$package/root/$(dirname "$path")"
+    cp -a "/$path" "$package/root/$path"
+done
+dpkg-deb --root-owner-group --build "$package/root" "$package/aphrodite-base.deb"
+dpkg -i "$package/aphrodite-base.deb"
+install -d /var/cache/aphrodite/build
+install -m 0644 "$package/aphrodite-base.deb" "/var/cache/aphrodite/build/aphrodite-base_${version}_all.deb"
+flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo

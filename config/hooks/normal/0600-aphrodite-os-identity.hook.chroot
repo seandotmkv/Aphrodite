@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+# Keep the Debian original under dpkg ownership and the image identity across upgrades.
+dpkg-divert --quiet --local --add --rename \
+    --divert /usr/lib/os-release.debian /usr/lib/os-release
+
+cat > /usr/lib/os-release <<'RELEASE'
+NAME="Aphrodite OS"
+PRETTY_NAME="Aphrodite OS"
+ID=aphrodite
+ID_LIKE=debian
+VERSION="0 (infant)"
+VERSION_ID=0
+VERSION_CODENAME=infant
+IMAGE_ID=aphrodite
+IMAGE_VERSION=0
+BUILD_ID=aphrodite-os-0
+RELEASE
+
+ln -sfn ../usr/lib/os-release /etc/os-release
